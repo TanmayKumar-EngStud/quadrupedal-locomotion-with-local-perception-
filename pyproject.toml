@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "language-guided-quadrupedal-navigation"
+version = "0.1.0"
+description = "MuJoCo Go1 scenes for language-guided navigation over sparse terrain"
+requires-python = ">=3.12"
+dependencies = ["mujoco==3.3.7", "numpy>=2,<3", "pillow>=11,<12"]
+
+[dependency-groups]
+dev = ["pytest>=8,<9"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quadruped_nav"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

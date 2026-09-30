@@ -1,0 +1,409 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="Go1 — dead_end field">
+  <compiler angle="radian" meshdir="../assets/unitree_go1/assets" autolimits="true" />
+  <option cone="elliptic" impratio="100" timestep="0.002" integrator="implicitfast" />
+  <default>
+    <default class="go1">
+      <geom friction="0.6" margin="0.001" condim="1" />
+      <joint axis="0 1 0" damping="2" armature="0.01" frictionloss="0.2" />
+      <position kp="100" forcerange="-23.7 23.7" />
+      <default class="abduction">
+        <joint axis="1 0 0" damping="1" range="-0.863 0.863" />
+        <position ctrlrange="-0.863 0.863" />
+      </default>
+      <default class="hip">
+        <joint range="-0.686 4.501" />
+        <position ctrlrange="-0.686 4.501" />
+      </default>
+      <default class="knee">
+        <joint range="-2.818 -0.888" />
+        <position forcerange="-35.55 35.55" ctrlrange="-2.818 -0.888" />
+      </default>
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2" material="dark" />
+      </default>
+      <default class="collision">
+        <geom group="3" type="capsule" />
+        <default class="hip_left1">
+          <geom size="0.046 0.02" pos="0 0.045 0" quat="1 1 0 0" type="cylinder" />
+        </default>
+        <default class="hip_left2">
+          <geom size="0.031 0.02" pos="0 0.065 0" quat="1 1 0 0" type="cylinder" />
+        </default>
+        <default class="hip_left3">
+          <geom size="0.046 0.02" quat="1 1 0 0" type="cylinder" />
+        </default>
+        <default class="hip_right1">
+          <geom size="0.046 0.02" pos="0 -0.045 0" quat="1 1 0 0" type="cylinder" />
+        </default>
+        <default class="hip_right2">
+          <geom size="0.031 0.02" pos="0 -0.065 0" quat="1 1 0 0" type="cylinder" />
+        </default>
+        <default class="hip_right3">
+          <geom size="0.046 0.02" quat="1 1 0 0" type="cylinder" />
+        </default>
+        <default class="thigh1">
+          <geom size="0.015" fromto="-0.02 0 0 -0.02 0 -0.16" />
+        </default>
+        <default class="thigh2">
+          <geom size="0.015" fromto="0 0 0 -0.02 0 -0.1" />
+        </default>
+        <default class="thigh3">
+          <geom size="0.015" fromto="-0.02 0 -0.16 0 0 -0.2" />
+        </default>
+        <default class="calf1">
+          <geom size="0.01" fromto="0 0 0 0.02 0 -0.13" />
+        </default>
+        <default class="calf2">
+          <geom size="0.01" fromto="0.02 0 -0.13 0 0 -0.2" />
+        </default>
+        <default class="foot">
+          <geom type="sphere" size="0.023" pos="0 0 -0.213" priority="1" solimp="0.015 1 0.023" condim="6" friction="0.8 0.02 0.01" />
+        </default>
+      </default>
+    </default>
+  </default>
+  <asset>
+    <material name="dark" rgba="0.2 0.2 0.2 1" />
+    <mesh class="go1" file="trunk.stl" />
+    <mesh class="go1" file="hip.stl" />
+    <mesh class="go1" file="thigh_mirror.stl" />
+    <mesh class="go1" file="calf.stl" />
+    <mesh class="go1" file="thigh.stl" />
+    <texture type="skybox" builtin="gradient" rgb1="0.12 0.17 0.24" rgb2="0.035 0.05 0.075" width="512" height="3072" />
+    <texture name="pit_tex" type="2d" builtin="checker" rgb1="0.065 0.085 0.11" rgb2="0.08 0.105 0.13" width="512" height="512" />
+    <material name="pit_mat" texture="pit_tex" texrepeat="20 20" reflectance="0.03" />
+    <mesh name="landmark_cone" vertex="0 0 0.36 0.12 0.0 0 0.1159110991546882 0.03105828541230249 0 0.10392304845413264 0.05999999999999999 0 0.08485281374238571 0.0848528137423857 0 0.06000000000000001 0.10392304845413262 0 0.03105828541230249 0.1159110991546882 0 7.347880794884118e-18 0.12 0 -0.031058285412302475 0.1159110991546882 0 -0.05999999999999998 0.10392304845413264 0 -0.0848528137423857 0.08485281374238571 0 -0.10392304845413264 0.05999999999999999 0 -0.11591109915468818 0.03105828541230252 0 -0.12 1.4695761589768237e-17 0 -0.1159110991546882 -0.031058285412302496 0 -0.10392304845413265 -0.05999999999999997 0 -0.08485281374238575 -0.08485281374238565 0 -0.06000000000000005 -0.1039230484541326 0 -0.031058285412302475 -0.1159110991546882 0 -2.2043642384652355e-17 -0.12 0 0.031058285412302433 -0.11591109915468821 0 0.06000000000000001 -0.10392304845413262 0 0.08485281374238568 -0.08485281374238572 0 0.1039230484541326 -0.06000000000000005 0 0.11591109915468817 -0.031058285412302586 0 0 0 0" face="0 1 2 0 2 3 0 3 4 0 4 5 0 5 6 0 6 7 0 7 8 0 8 9 0 9 10 0 10 11 0 11 12 0 12 13 0 13 14 0 14 15 0 15 16 0 16 17 0 17 18 0 18 19 0 19 20 0 20 21 0 21 22 0 22 23 0 23 24 0 24 1 25 2 1 25 3 2 25 4 3 25 5 4 25 6 5 25 7 6 25 8 7 25 9 8 25 10 9 25 11 10 25 12 11 25 13 12 25 14 13 25 15 14 25 16 15 25 17 16 25 18 17 25 19 18 25 20 19 25 21 20 25 22 21 25 23 22 25 24 23 25 1 24" />
+  </asset>
+  <worldbody>
+    <light name="spotlight" mode="targetbodycom" target="trunk" pos="0 -1 2" />
+    <body name="trunk" pos="0 0 0.445" childclass="go1">
+      <camera name="tracking" mode="trackcom" pos="0 -1 0.8" xyaxes="1 0 0 0 1 1" />
+      <site name="head" pos="0.3 0 0" rgba="1 0 0 1" size="0.02" group="5" />
+      <inertial pos="0.0223 0.002 -0.0005" quat="-0.00342088 0.705204 0.000106698 0.708996" mass="5.204" diaginertia="0.0716565 0.0630105 0.0168101" />
+      <freejoint />
+      <geom class="visual" mesh="trunk" />
+      <geom class="collision" size="0.125 0.04 0.057" type="box" />
+      <geom class="collision" quat="1 0 1 0" pos="0 -0.04 0" size="0.058 0.125" type="cylinder" />
+      <geom class="collision" quat="1 0 1 0" pos="0 +0.04 0" size="0.058 0.125" type="cylinder" />
+      <geom class="collision" pos="0.25 0 0" size="0.005 0.06 0.05" type="box" />
+      <geom class="collision" pos="0.25 0.06 -0.01" size="0.009 0.035" />
+      <geom class="collision" pos="0.25 -0.06 -0.01" size="0.009 0.035" />
+      <geom class="collision" pos="0.25 0 -0.05" size="0.01 0.06" quat="1 1 0 0" />
+      <geom class="collision" pos="0.255 0 0.0355" size="0.021 0.052" quat="1 1 0 0" />
+      <site name="imu" pos="0 0 0" />
+      <body name="FR_hip" pos="0.1881 -0.04675 0">
+        <inertial pos="-0.0049166 0.00762615 -8.865e-05" quat="0.507341 0.514169 0.495027 0.482891" mass="0.68" diaginertia="0.000734064 0.000468438 0.000398719" />
+        <joint class="abduction" name="FR_hip_joint" />
+        <geom class="visual" mesh="hip" quat="1 0 0 0" />
+        <geom class="hip_right1" />
+        <geom class="hip_right2" />
+        <body name="FR_thigh" pos="0 -0.08 0">
+          <inertial pos="-0.00304722 0.019315 -0.0305004" quat="0.65243 -0.0272313 0.0775126 0.753383" mass="1.009" diaginertia="0.00478717 0.00460903 0.000709268" />
+          <joint class="hip" name="FR_thigh_joint" />
+          <geom class="visual" mesh="thigh_mirror" />
+          <geom class="thigh1" />
+          <geom class="thigh2" />
+          <geom class="thigh3" />
+          <body name="FR_calf" pos="0 0 -0.213">
+            <inertial pos="0.00429862 0.000976676 -0.146197" quat="0.691246 0.00357467 0.00511118 0.722592" mass="0.195862" diaginertia="0.00149767 0.00148468 3.58427e-05" />
+            <joint class="knee" name="FR_calf_joint" />
+            <geom class="visual" mesh="calf" />
+            <geom class="calf1" />
+            <geom class="calf2" />
+            <geom name="FR" class="foot" />
+            <site name="FR" pos="0 0 -0.213" type="sphere" size="0.023" group="5" />
+          </body>
+        </body>
+      </body>
+      <body name="FL_hip" pos="0.1881 0.04675 0">
+        <inertial pos="-0.0049166 -0.00762615 -8.865e-05" quat="0.482891 0.495027 0.514169 0.507341" mass="0.68" diaginertia="0.000734064 0.000468438 0.000398719" />
+        <joint class="abduction" name="FL_hip_joint" />
+        <geom class="visual" mesh="hip" />
+        <geom class="hip_left1" />
+        <geom class="hip_left2" />
+        <body name="FL_thigh" pos="0 0.08 0">
+          <inertial pos="-0.00304722 -0.019315 -0.0305004" quat="0.753383 0.0775126 -0.0272313 0.65243" mass="1.009" diaginertia="0.00478717 0.00460903 0.000709268" />
+          <joint class="hip" name="FL_thigh_joint" />
+          <geom class="visual" mesh="thigh" />
+          <geom class="thigh1" />
+          <geom class="thigh2" />
+          <geom class="thigh3" />
+          <body name="FL_calf" pos="0 0 -0.213">
+            <inertial pos="0.00429862 0.000976676 -0.146197" quat="0.691246 0.00357467 0.00511118 0.722592" mass="0.195862" diaginertia="0.00149767 0.00148468 3.58427e-05" />
+            <joint class="knee" name="FL_calf_joint" />
+            <geom class="visual" mesh="calf" />
+            <geom class="calf1" />
+            <geom class="calf2" />
+            <geom name="FL" class="foot" />
+            <site name="FL" pos="0 0 -0.213" type="sphere" size="0.023" group="5" />
+          </body>
+        </body>
+      </body>
+      <body name="RR_hip" pos="-0.1881 -0.04675 0">
+        <inertial pos="0.0049166 0.00762615 -8.865e-05" quat="0.495027 0.482891 0.507341 0.514169" mass="0.68" diaginertia="0.000734064 0.000468438 0.000398719" />
+        <joint class="abduction" name="RR_hip_joint" />
+        <geom class="visual" quat="0 0 0 -1" mesh="hip" />
+        <geom class="hip_right1" />
+        <geom class="hip_right2" />
+        <geom class="hip_right3" />
+        <body name="RR_thigh" pos="0 -0.08 0">
+          <inertial pos="-0.00304722 0.019315 -0.0305004" quat="0.65243 -0.0272313 0.0775126 0.753383" mass="1.009" diaginertia="0.00478717 0.00460903 0.000709268" />
+          <joint class="hip" name="RR_thigh_joint" />
+          <geom class="visual" mesh="thigh_mirror" />
+          <geom class="thigh1" />
+          <geom class="thigh2" />
+          <geom class="thigh3" />
+          <body name="RR_calf" pos="0 0 -0.213">
+            <inertial pos="0.00429862 0.000976676 -0.146197" quat="0.691246 0.00357467 0.00511118 0.722592" mass="0.195862" diaginertia="0.00149767 0.00148468 3.58427e-05" />
+            <joint class="knee" name="RR_calf_joint" />
+            <geom class="visual" mesh="calf" />
+            <geom class="calf1" />
+            <geom class="calf2" />
+            <geom name="RR" class="foot" />
+            <site name="RR" pos="0 0 -0.213" type="sphere" size="0.023" group="5" />
+          </body>
+        </body>
+      </body>
+      <body name="RL_hip" pos="-0.1881 0.04675 0">
+        <inertial pos="0.0049166 -0.00762615 -8.865e-05" quat="0.514169 0.507341 0.482891 0.495027" mass="0.68" diaginertia="0.000734064 0.000468438 0.000398719" />
+        <joint class="abduction" name="RL_hip_joint" />
+        <geom class="visual" quat="0 0 1 0" mesh="hip" />
+        <geom class="hip_left1" />
+        <geom class="hip_left2" />
+        <geom class="hip_left3" />
+        <body name="RL_thigh" pos="0 0.08 0">
+          <inertial pos="-0.00304722 -0.019315 -0.0305004" quat="0.753383 0.0775126 -0.0272313 0.65243" mass="1.009" diaginertia="0.00478717 0.00460903 0.000709268" />
+          <joint class="hip" name="RL_thigh_joint" />
+          <geom class="visual" mesh="thigh" />
+          <geom class="thigh1" />
+          <geom class="thigh2" />
+          <geom class="thigh3" />
+          <body name="RL_calf" pos="0 0 -0.213">
+            <inertial pos="0.00429862 0.000976676 -0.146197" quat="0.691246 0.00357467 0.00511118 0.722592" mass="0.195862" diaginertia="0.00149767 0.00148468 3.58427e-05" />
+            <joint class="knee" name="RL_calf_joint" />
+            <geom class="visual" mesh="calf" />
+            <geom class="calf1" />
+            <geom class="calf2" />
+            <geom name="RL" class="foot" />
+            <site name="RL" pos="0 0 -0.213" type="sphere" size="0.023" group="5" />
+          </body>
+        </body>
+      </body>
+    </body>
+    <light name="key" pos="1 -4 8" dir="0.3 0.3 -1" directional="true" diffuse="0.85 0.82 0.75" castshadow="true" />
+    <light name="fill" pos="7 4 6" dir="-0.3 -0.3 -1" directional="true" diffuse="0.4 0.48 0.6" castshadow="false" />
+    <geom name="pit_floor" type="plane" pos="0 0 -1.2" size="20 20 0.1" material="pit_mat" group="0" />
+    <geom name="S00_00" type="box" pos="0.0 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_01" type="box" pos="0.0 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_02" type="box" pos="0.0 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_03" type="box" pos="0.0 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_04" type="box" pos="0.0 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_05" type="box" pos="0.0 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_06" type="box" pos="0.0 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_07" type="box" pos="0.0 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_08" type="box" pos="0.0 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_09" type="box" pos="0.0 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_10" type="box" pos="0.0 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_11" type="box" pos="0.0 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_12" type="box" pos="0.0 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_13" type="box" pos="0.0 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S00_14" type="box" pos="0.0 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_00" type="box" pos="0.5 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_01" type="box" pos="0.5 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_02" type="box" pos="0.5 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_03" type="box" pos="0.5 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_04" type="box" pos="0.5 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_05" type="box" pos="0.5 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_06" type="box" pos="0.5 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_07" type="box" pos="0.5 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_08" type="box" pos="0.5 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_09" type="box" pos="0.5 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_10" type="box" pos="0.5 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_11" type="box" pos="0.5 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_12" type="box" pos="0.5 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_13" type="box" pos="0.5 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S01_14" type="box" pos="0.5 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_00" type="box" pos="1.0 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_01" type="box" pos="1.0 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_02" type="box" pos="1.0 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_03" type="box" pos="1.0 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_04" type="box" pos="1.0 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_05" type="box" pos="1.0 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_06" type="box" pos="1.0 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_07" type="box" pos="1.0 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_08" type="box" pos="1.0 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_09" type="box" pos="1.0 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_10" type="box" pos="1.0 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_11" type="box" pos="1.0 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_12" type="box" pos="1.0 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_13" type="box" pos="1.0 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S02_14" type="box" pos="1.0 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_00" type="box" pos="1.5 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_01" type="box" pos="1.5 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_02" type="box" pos="1.5 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_03" type="box" pos="1.5 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_04" type="box" pos="1.5 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_06" type="box" pos="1.5 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_07" type="box" pos="1.5 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_08" type="box" pos="1.5 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_10" type="box" pos="1.5 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_11" type="box" pos="1.5 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_12" type="box" pos="1.5 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_13" type="box" pos="1.5 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S03_14" type="box" pos="1.5 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_00" type="box" pos="2.0 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_01" type="box" pos="2.0 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_02" type="box" pos="2.0 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_03" type="box" pos="2.0 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_04" type="box" pos="2.0 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_06" type="box" pos="2.0 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_07" type="box" pos="2.0 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_08" type="box" pos="2.0 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_10" type="box" pos="2.0 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_11" type="box" pos="2.0 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_12" type="box" pos="2.0 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_13" type="box" pos="2.0 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S04_14" type="box" pos="2.0 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_00" type="box" pos="2.5 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_01" type="box" pos="2.5 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_02" type="box" pos="2.5 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_03" type="box" pos="2.5 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_04" type="box" pos="2.5 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_06" type="box" pos="2.5 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_07" type="box" pos="2.5 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_08" type="box" pos="2.5 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_10" type="box" pos="2.5 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_11" type="box" pos="2.5 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_12" type="box" pos="2.5 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_13" type="box" pos="2.5 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S05_14" type="box" pos="2.5 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_00" type="box" pos="3.0 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_01" type="box" pos="3.0 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_02" type="box" pos="3.0 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_03" type="box" pos="3.0 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_04" type="box" pos="3.0 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_06" type="box" pos="3.0 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_07" type="box" pos="3.0 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_08" type="box" pos="3.0 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_10" type="box" pos="3.0 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_11" type="box" pos="3.0 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_12" type="box" pos="3.0 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_13" type="box" pos="3.0 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S06_14" type="box" pos="3.0 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S07_12" type="box" pos="3.5 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S08_12" type="box" pos="4.0 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_00" type="box" pos="4.5 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_01" type="box" pos="4.5 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_02" type="box" pos="4.5 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_03" type="box" pos="4.5 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_04" type="box" pos="4.5 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_05" type="box" pos="4.5 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_06" type="box" pos="4.5 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_07" type="box" pos="4.5 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_08" type="box" pos="4.5 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_09" type="box" pos="4.5 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_10" type="box" pos="4.5 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_11" type="box" pos="4.5 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_12" type="box" pos="4.5 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_13" type="box" pos="4.5 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S09_14" type="box" pos="4.5 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_00" type="box" pos="5.0 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_01" type="box" pos="5.0 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_02" type="box" pos="5.0 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_03" type="box" pos="5.0 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_04" type="box" pos="5.0 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_05" type="box" pos="5.0 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_06" type="box" pos="5.0 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_07" type="box" pos="5.0 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_08" type="box" pos="5.0 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_09" type="box" pos="5.0 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_10" type="box" pos="5.0 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_11" type="box" pos="5.0 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_12" type="box" pos="5.0 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_13" type="box" pos="5.0 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S10_14" type="box" pos="5.0 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_00" type="box" pos="5.5 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_01" type="box" pos="5.5 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_02" type="box" pos="5.5 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_03" type="box" pos="5.5 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_04" type="box" pos="5.5 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_05" type="box" pos="5.5 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_06" type="box" pos="5.5 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_07" type="box" pos="5.5 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_08" type="box" pos="5.5 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_09" type="box" pos="5.5 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_10" type="box" pos="5.5 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_11" type="box" pos="5.5 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_12" type="box" pos="5.5 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_13" type="box" pos="5.5 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S11_14" type="box" pos="5.5 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_00" type="box" pos="6.0 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_01" type="box" pos="6.0 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_02" type="box" pos="6.0 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_03" type="box" pos="6.0 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_04" type="box" pos="6.0 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_05" type="box" pos="6.0 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_06" type="box" pos="6.0 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_07" type="box" pos="6.0 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_08" type="box" pos="6.0 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_09" type="box" pos="6.0 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_10" type="box" pos="6.0 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_11" type="box" pos="6.0 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_12" type="box" pos="6.0 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_13" type="box" pos="6.0 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S12_14" type="box" pos="6.0 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_00" type="box" pos="6.5 -3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_01" type="box" pos="6.5 -3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_02" type="box" pos="6.5 -2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_03" type="box" pos="6.5 -2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_04" type="box" pos="6.5 -1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_05" type="box" pos="6.5 -1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_06" type="box" pos="6.5 -0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_07" type="box" pos="6.5 0.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_08" type="box" pos="6.5 0.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_09" type="box" pos="6.5 1.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_10" type="box" pos="6.5 1.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_11" type="box" pos="6.5 2.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_12" type="box" pos="6.5 2.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_13" type="box" pos="6.5 3.0 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="S13_14" type="box" pos="6.5 3.5 -0.6" size="0.23 0.23 0.6" rgba="0.48 0.55 0.61 1" friction="0.9 0.02 0.002" group="0" />
+    <geom name="P0" type="box" pos="-0.77 0.0 -0.6" size="0.5 0.5 0.6" rgba="0.24 0.65 0.58 1" friction="0.9 0.02 0.002" group="0" />
+    <site name="label_P0" type="sphere" pos="-0.77 0.0 0.012" size="0.025" rgba="0.7 1 0.93 1" group="4" />
+    <geom name="P1" type="box" pos="7.17 -2.0 -0.6" size="0.4 0.4 0.6" rgba="0.28 0.45 0.56 1" friction="0.9 0.02 0.002" group="0" />
+    <site name="label_P1" type="sphere" pos="7.17 -2.0 0.012" size="0.025" rgba="0.7 1 0.93 1" group="4" />
+    <geom name="P2" type="box" pos="7.17 0.0 -0.6" size="0.4 0.4 0.6" rgba="0.28 0.45 0.56 1" friction="0.9 0.02 0.002" group="0" />
+    <site name="label_P2" type="sphere" pos="7.17 0.0 0.012" size="0.025" rgba="0.7 1 0.93 1" group="4" />
+    <geom name="P3" type="box" pos="7.17 2.0 -0.6" size="0.4 0.4 0.6" rgba="0.28 0.45 0.56 1" friction="0.9 0.02 0.002" group="0" />
+    <site name="label_P3" type="sphere" pos="7.17 2.0 0.012" size="0.025" rgba="0.7 1 0.93 1" group="4" />
+    <geom name="L1_plinth" type="cylinder" pos="7.82 -2.0 -0.04" size="0.18 0.04" rgba="0.17 0.23 0.29 1" contype="0" conaffinity="0" group="1" />
+    <geom type="box" size="0.13 0.13 0.16" pos="7.82 -2.0 0.16" name="L1" rgba="0.93 0.25 0.18 1" contype="0" conaffinity="0" group="1" />
+    <geom name="L2_plinth" type="cylinder" pos="7.82 0.0 -0.04" size="0.18 0.04" rgba="0.17 0.23 0.29 1" contype="0" conaffinity="0" group="1" />
+    <geom type="mesh" mesh="landmark_cone" pos="7.82 0.0 0.0" name="L2" rgba="0.08 0.48 0.95 1" contype="0" conaffinity="0" group="1" />
+    <geom name="L3_plinth" type="cylinder" pos="7.82 2.0 -0.04" size="0.18 0.04" rgba="0.17 0.23 0.29 1" contype="0" conaffinity="0" group="1" />
+    <geom type="mesh" mesh="landmark_cone" pos="7.82 2.0 0.0" name="L3" rgba="1 0.70 0.10 1" contype="0" conaffinity="0" group="1" />
+  </worldbody>
+  <actuator>
+    <position class="abduction" name="FR_hip" joint="FR_hip_joint" />
+    <position class="hip" name="FR_thigh" joint="FR_thigh_joint" />
+    <position class="knee" name="FR_calf" joint="FR_calf_joint" />
+    <position class="abduction" name="FL_hip" joint="FL_hip_joint" />
+    <position class="hip" name="FL_thigh" joint="FL_thigh_joint" />
+    <position class="knee" name="FL_calf" joint="FL_calf_joint" />
+    <position class="abduction" name="RR_hip" joint="RR_hip_joint" />
+    <position class="hip" name="RR_thigh" joint="RR_thigh_joint" />
+    <position class="knee" name="RR_calf" joint="RR_calf_joint" />
+    <position class="abduction" name="RL_hip" joint="RL_hip_joint" />
+    <position class="hip" name="RL_thigh" joint="RL_thigh_joint" />
+    <position class="knee" name="RL_calf" joint="RL_calf_joint" />
+  </actuator>
+  <keyframe>
+    <key name="home" qpos="-0.77 0.0 0.3 1.0 0 0 0.0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 " ctrl="0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8" />
+  </keyframe>
+  <visual>
+    <global offwidth="1600" offheight="1000" azimuth="135" elevation="-40" />
+    <quality shadowsize="4096" offsamples="4" />
+    <headlight ambient="0.35 0.38 0.44" diffuse="0.7 0.7 0.7" specular="0.25 0.25 0.25" />
+    <rgba haze="0.08 0.11 0.17 1" />
+  </visual>
+</mujoco>
