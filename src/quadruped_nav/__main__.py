@@ -42,9 +42,9 @@ def main():
         state = {"paused":False,"camera":"overview","reset":False}
         def key(code):
             if code == 32: state["paused"] = not state["paused"]
-            elif code in (49,50,51): state["camera"] = {49:"overview",50:"robot",51:"top"}[code]
+            elif code in (55,56,57): state["camera"] = {55:"overview",56:"robot",57:"top"}[code]
             elif code in (82,114): state["reset"] = True
-        print("1 overview | 2 Go1 close-up | 3 top | Space pause | R reset. Mouse: orbit, pan, zoom.",flush=True)
+        print("7 overview | 8 Go1 close-up | 9 top | Space pause | R reset. Mouse: orbit, pan, zoom.",flush=True)
         with mujoco.viewer.launch_passive(sim.model,sim.data,key_callback=key,show_left_ui=False,show_right_ui=False) as viewer:
             last_camera = None
             viewer.opt.geomgroup[3] = 0

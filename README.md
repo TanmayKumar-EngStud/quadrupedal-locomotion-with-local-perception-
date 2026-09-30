@@ -38,9 +38,9 @@ In the viewer:
 
 | Control | Action |
 | --- | --- |
-| 1 | Overview |
-| 2 | Go1 close-up |
-| 3 | Top view |
+| 7 | Overview |
+| 8 | Go1 close-up |
+| 9 | Top view |
 | Space | Pause/resume |
 | R | Reset standing pose |
 | Left mouse drag | Rotate camera |
