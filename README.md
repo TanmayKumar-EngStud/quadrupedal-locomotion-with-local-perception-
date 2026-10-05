@@ -1,10 +1,16 @@
 # Language-Guided Quadrupedal Navigation
 
-A MuJoCo environment foundation for a simulated **Unitree Go1** navigating stepping-stone fields toward platforms identified by language.
+A MuJoCo environment foundation for a simulated **Unitree Go1**. The current project studies **subgoal planning under partial observability**: a local planner chooses targets for a learned goal-reaching controller. The repository name is retained from the earlier project scope.
 
 ![Go1 in the moat environment](outputs/moat_presentation.png)
 
-## Current build
+## Collaboration and progress
+
+Follow [AGENTS.md](AGENTS.md) for the contributor-branch and pull-request workflow. Check and update [Goals.md](Goals.md) before pushing. Day 1 is October 5, 2026; the project deadline is October 16, 2026.
+
+[Interface examples for team review](docs/INTERFACES.md) describe proposed pile and planner/controller messages. They are drafts, not an implemented API.
+
+## Current build (earlier scene prototype)
 
 - Three terrain families: **open**, **moat**, and **dead-end**.
 - Ten difficulty levels, interpolating the proposal's stone size/gap anchors: level 0 = 46/4 cm, level 5 = 26/9 cm, level 9 = 10/13 cm.
@@ -87,9 +93,9 @@ tests/                     Geometry, graph connectivity and physics checks
 
 ## Relationship to the proposal
 
-The authoritative proposal is [Language-Guided Legged Navigation: Technical Design and Build Plan](docs/Language-Guided%20Legged%20Navigation%20Technical%20Design%20and%20Build%20Plan.pdf), dated September 30, 2026. The older proposal is superseded.
+The current specification is [Project Proposal v2](docs/Project_Proposal_v2.pdf) and the [two-week plan](docs/Two-week%20plan%20subgoal%20planning.md). They supersede the September 30 design retained in `docs/` for historical context. Language grounding and execution-aware edge-cost learning are no longer current deliverables.
 
-This first milestone uses native MuJoCo to inspect scene geometry on macOS. **mjlab integration, the height scan, PPO training, the goal executor, language grounding and execution-aware edge costs are not implemented.** The JSON layouts and robot asset are reusable inputs for that integration. Proposed terrain difficulty is a hypothesis to calibrate, not demonstrated robot capability.
+This first milestone uses native MuJoCo to inspect scene geometry on macOS. **mjlab integration, the height scan, PPO training, the abstract planner simulator, local planners, the learned planner and the goal executor are not implemented.** The JSON layouts and robot asset are reusable inputs for that integration. Proposed terrain difficulty is a hypothesis to calibrate, not demonstrated robot capability.
 
 ## Asset provenance
 
