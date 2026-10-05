@@ -6,7 +6,7 @@ A MuJoCo environment foundation for a simulated **Unitree Go1**. The current pro
 
 ## Collaboration and progress
 
-Follow [AGENTS.md](AGENTS.md) for the contributor-branch and pull-request workflow. Check and update [Goals.md](Goals.md) before pushing. Day 1 is October 5, 2026; the project deadline is October 16, 2026.
+Follow [AGENTS.md](AGENTS.md) for the contributor-branch workflow. Agents push to the contributor's branch and report changes in chat; contributors review and validate the changes, then create pull requests themselves. Check and update [Goals.md](Goals.md) before pushing. Day 1 is October 5, 2026; the project deadline is October 16, 2026.
 
 [Interface examples for team review](docs/INTERFACES.md) describe proposed pile and planner/controller messages. They are drafts, not an implemented API.
 
