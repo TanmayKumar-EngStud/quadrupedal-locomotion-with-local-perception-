@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navigation study · Abstract simulator</title>
+<style>
+:root{color-scheme:light;--ink:#20392d;--muted:#59685e;--paper:#f6f7f1;--line:#d6ded1;--green:#218849;--blue:#2463eb;--orange:#ad641d}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 "Avenir Next",Avenir,"Segoe UI",sans-serif}main{max-width:1480px;margin:auto;padding:28px 40px}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:17px}.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}.tag{font-size:12px;border:1px solid var(--line);border-radius:20px;padding:5px 12px}h1{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:clamp(30px,3vw,44px);font-weight:500;letter-spacing:-.035em;margin:20px 0 4px}p{margin:0;color:var(--muted)}.toolbar{display:flex;justify-content:space-between;gap:14px;align-items:center;margin:23px 0 15px;flex-wrap:wrap}.choices{display:flex;gap:4px;background:#e7ece2;padding:4px;border-radius:8px}button,select{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);border-radius:5px;background:var(--paper);padding:8px 14px}button:hover{background:#e8efdf}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:3px}.choices button{border:0;background:transparent;padding:7px 17px}.choices button[aria-pressed=true]{background:#fcfdf8;box-shadow:0 1px 3px #18302018}.checks{display:flex;gap:17px;font-size:13px}.checks label{display:flex;gap:6px;align-items:center}input[type=checkbox]{accent-color:var(--green)}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 250px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fcfdf8}.map-panel{min-width:0}.map-top{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}.canvas-wrap{height:clamp(380px,51vw,610px);position:relative}canvas{width:100%;height:100%;display:block}.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;padding:12px 18px;border-top:1px solid var(--line)}.legend span{display:flex;align-items:center;gap:7px}.swatch{width:22px;height:3px;background:var(--blue)}.swatch.coverage{height:13px;border:2px solid #218849;background:#c6efb2;border-radius:50%}.swatch.oracle{height:0;background:none;border-top:2px dashed var(--orange)}aside{padding:22px;border-left:1px solid var(--line);background:#f1f4eb}h2{font-size:13px;font-weight:700;margin:0 0 16px}.status{font-family:Georgia,serif;font-size:27px;margin:4px 0 14px}.metric{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:10px 0;font-size:13px}.metric strong{font-weight:600}aside p{font-size:12px;margin-top:15px}.result{margin-top:27px;padding-top:16px;border-top:1px solid var(--line)}.result h2{margin-bottom:5px}.controls{display:flex;align-items:center;gap:10px;padding:17px 0 11px}.primary{background:var(--ink);color:#f4f7ec;border-color:var(--ink);min-width:109px}.primary:hover{background:#355844}.timeline{flex:1;min-width:50px;accent-color:var(--blue)}.time{font-size:12px;min-width:89px;text-align:right;font-variant-numeric:tabular-nums}.note{font-size:12px;max-width:890px}.details{margin-top:22px;border-top:1px solid var(--line);padding-top:16px}summary{cursor:pointer;font-size:13px;font-weight:600}.details-body{padding-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:28px}.details-body p,.details-body li{font-size:13px}ul{padding-left:18px;margin-top:7px}.download{margin-top:14px;font-size:13px}.table-scroll{max-height:250px;overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:6px 9px}footer{font-size:11px;letter-spacing:.04em;color:var(--muted);padding-top:20px}button:disabled{cursor:default;opacity:.4}@media(max-width:850px){main{padding:20px}.workspace{grid-template-columns:1fr}aside{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:0 24px}aside>h2,aside>.status,aside>p{grid-column:1/-1}.result{grid-column:1/-1;margin-top:12px}.canvas-wrap{height:430px}.details-body{grid-template-columns:1fr}.checks{flex-wrap:wrap}.controls{flex-wrap:wrap}.timeline{min-width:110px}h1{font-size:32px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body><main>
+<header><div class="eyebrow">Quadrupedal navigation / Planning study</div><div class="tag">Day 01 · Abstract simulator</div></header>
+<h1>What can the planner see?</h1>
+<p>Follow the greedy planner through a field of piles. Its next target comes only from the green observation window.</p>
+<div class="toolbar"><div class="choices" id="terrainChoices" role="group" aria-label="Terrain layout"></div><div class="checks"><label><input id="showWorld" type="checkbox" checked> Show full terrain</label><label><input id="showOracle" type="checkbox" checked> Oracle reference</label></div></div>
+<div class="workspace"><section class="map-panel" aria-label="Navigation replay">
+<div class="map-top"><span id="mapLabel">Top view · metres</span><span>+X right · +Y up</span></div>
+<div class="canvas-wrap"><canvas id="map" role="img" aria-label="Top-down replay showing the greedy trajectory in blue and a light-green observation circle with a green border"></canvas></div>
+<div class="legend"><span><i class="swatch coverage"></i>Local coverage · 2 m radius</span><span><i class="swatch"></i>Greedy path</span><span><i class="swatch oracle"></i>Full-map oracle</span></div>
+</section><aside><h2>GREEDY PLANNER</h2><div class="status" id="stateLabel">Ready to replay</div>
+<div class="metric"><span>Decision</span><strong id="decisionValue">0</strong></div>
+<div class="metric"><span>Distance travelled</span><strong id="distanceValue">0.00 m</strong></div>
+<div class="metric"><span>Visible piles</span><strong id="visibleValue">0</strong></div>
+<div class="metric"><span>Repeated targets</span><strong id="repeatValue">0</strong></div>
+<p id="decisionNote">Press Play to inspect each subgoal.</p>
+<div class="result"><h2>RECORDED EPISODE</h2><p id="finalResult"></p><p id="oracleResult"></p></div>
+<p>Full terrain and the oracle are observer overlays. The greedy planner cannot read either.</p>
+</aside></div>
+<div class="controls"><button id="play" class="primary">Play replay</button><button id="step" aria-label="Advance to the next planner decision">Step →</button><button id="reset" aria-label="Restart replay">↺ Reset</button><input id="timeline" class="timeline" type="range" min="0" max="60" value="0" step="0.01" aria-label="Replay time in simulated seconds"><span class="time" id="clock">0.0 / 60.0 s</span><select id="speed" aria-label="Playback speed"><option value="1">1× speed</option><option value="2" selected>2× speed</option><option value="4">4× speed</option></select></div>
+<p class="note">Abstract navigation replay: the marker represents the robot’s position. Motion between supports is illustrative; these are uncalibrated geometric results, not Go1 walking performance.</p>
+<details class="details"><summary>Inspect the model and decision log</summary><div class="details-body"><div><p id="limitsText"></p><ul id="assumptions"></ul><button class="download" id="download">Download this episode’s JSON</button></div><div class="table-scroll"><table><thead><tr><th>Decision</th><th>Time</th><th>Outcome</th><th>Target</th></tr></thead><tbody id="logRows"></tbody></table></div></div></details>
+<footer>LOCAL OBSERVATIONS → SUBGOAL CHOICE → ABSTRACT MOVEMENT → EPISODE LOG</footer>
+</main>
+<script id="episode-data" type="application/json">__EPISODE_DATA__</script>
+<script>
+'use strict';
+const bundle=JSON.parse(document.getElementById('episode-data').textContent);
+const $=id=>document.getElementById(id), canvas=$('map'), ctx=canvas.getContext('2d');
+let comparison, episode, time=0, playing=false, lastFrame=null, index=0;
+const names={open:'Open field',moat:'Moat crossing',dead_end:'Dead end'};
+const titleStatus={success:'Goal reached',timeout:'Timed out',no_candidate:'No valid target',planner_no_route:'No route',running:'Moving'};
+function setPlaying(value){playing=value;$('play').textContent=value?'Pause':'Play replay';}
+function choose(i){
+ index=i;comparison=bundle.comparisons[i];episode=comparison.episodes.greedy;time=0;setPlaying(false);
+ for(const [j,button] of [...$('terrainChoices').children].entries())button.setAttribute('aria-pressed',String(j===i));
+ $('timeline').max=Math.max(episode.metrics.simulated_time_s,.01);$('timeline').value=0;
+ $('mapLabel').textContent=`${names[comparison.family]||comparison.family} · level ${comparison.level} · seed ${comparison.seed}`;
+ const m=episode.metrics,o=comparison.episodes.oracle.metrics;
+ $('finalResult').textContent=`Greedy: ${titleStatus[m.status]||m.status}. ${m.distance_m.toFixed(2)} m in ${m.simulated_time_s.toFixed(1)} s; ${m.loop_piles} piles selected at least three times.`;
+ $('oracleResult').textContent=`Oracle: ${titleStatus[o.status]||o.status}. ${o.distance_m.toFixed(2)} m in ${o.simulated_time_s.toFixed(1)} s.`;
+ const l=comparison.limits;
+ $('limitsText').textContent=`Provisional limits: ${(l.max_gap_m*100).toFixed(0)} cm centreline gaps, ${(l.max_height_step_m*100).toFixed(0)} cm height steps, ${l.speed_m_s} m/s, ${l.subgoal_budget_s} s per subgoal, ${l.episode_budget_s} s per episode. No training is performed in this viewer.`;
+ $('assumptions').replaceChildren(...bundle.assumptions.map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));
+ $('logRows').replaceChildren(...episode.events.map(e=>{const tr=document.createElement('tr');for(const value of [e.decision_index+1,e.ended_at_s.toFixed(1)+' s',e.outcome,e.target_pile_id?.slice(-8)||'—']){const td=document.createElement('td');td.textContent=value;tr.append(td);}return tr;}));
+ draw();
+}
+bundle.comparisons.forEach((c,i)=>{const b=document.createElement('button');b.textContent=names[c.family]||c.family;b.addEventListener('click',()=>choose(i));$('terrainChoices').append(b);});
+function frameState(){
+ const states=episode.states;
+ let k=0;while(k+1<states.length&&states[k+1].time_s<=time+1e-7)k++;
+ const a=states[k],b=states[Math.min(k+1,states.length-1)];
+ const fraction=b.time_s>a.time_s?Math.min(1,Math.max(0,(time-a.time_s)/(b.time_s-a.time_s))):0;
+ return {k,x:a.x+(b.x-a.x)*fraction,y:a.y+(b.y-a.y)*fraction,
+         distance:a.distance_m+(b.distance_m-a.distance_m)*fraction,a,b};
+}
+function draw(){
+ if(!comparison)return;
+ const dpr=window.devicePixelRatio||1,w=canvas.clientWidth,h=canvas.clientHeight;
+ if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+ const piles=comparison.terrain.piles,robot=frameState(),radius=comparison.limits.observation_radius_m;
+ const minX=Math.min(...piles.map(p=>p.x-p.size/2))-radius-.2,maxX=Math.max(...piles.map(p=>p.x+p.size/2))+radius+.2;
+ const minY=Math.min(...piles.map(p=>p.y-p.size/2))-.65,maxY=Math.max(...piles.map(p=>p.y+p.size/2))+.65;
+ const scale=Math.min((w-34)/(maxX-minX),(h-36)/(maxY-minY));
+ const ox=(w-scale*(maxX-minX))/2,oy=(h-scale*(maxY-minY))/2;
+ const X=x=>ox+(x-minX)*scale,Y=y=>h-oy-(y-minY)*scale;
+ // World grid is only a scale reference, not extra planner observations.
+ ctx.strokeStyle='#e7ecdf';ctx.lineWidth=.7;ctx.beginPath();
+ for(let x=Math.ceil(minX);x<=maxX;x++){ctx.moveTo(X(x),Y(minY));ctx.lineTo(X(x),Y(maxY));}
+ for(let y=Math.ceil(minY);y<=maxY;y++){ctx.moveTo(X(minX),Y(y));ctx.lineTo(X(maxX),Y(y));}ctx.stroke();
+ let visibleCount=0;
+ for(const p of piles){
+  const visible=Math.hypot(p.x-robot.x,p.y-robot.y)<=radius+1e-9;
+  if(visible)visibleCount++;if(!visible&&!$('showWorld').checked)continue;
+  ctx.fillStyle=visible?'#f9fcf4':'#e7ebdf';ctx.strokeStyle=visible?'#8b9c83':'#d2dac9';ctx.lineWidth=visible?1:.7;
+  ctx.fillRect(X(p.x-p.size/2),Y(p.y+p.size/2),p.size*scale,p.size*scale);
+  ctx.strokeRect(X(p.x-p.size/2),Y(p.y+p.size/2),p.size*scale,p.size*scale);
+ }
+ // Requested local coverage: light green fill and an explicit green border.
+ ctx.beginPath();ctx.arc(X(robot.x),Y(robot.y),radius*scale,0,2*Math.PI);ctx.fillStyle='rgba(184, 233, 156, 0.38)';ctx.fill();ctx.strokeStyle='#218849';ctx.lineWidth=2;ctx.stroke();
+ function path(points,colour,width,dashed=false){if(!points.length)return;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(X(p.x),Y(p.y)):ctx.moveTo(X(p.x),Y(p.y)));ctx.strokeStyle=colour;ctx.lineWidth=width;ctx.lineJoin='round';ctx.lineCap='round';ctx.setLineDash(dashed?[6,5]:[]);ctx.stroke();ctx.setLineDash([]);}
+ if($('showOracle').checked)path(comparison.oracle_reference,'#ad641d',1.8,true);
+ const travelled=episode.states.slice(0,robot.k+1).concat([robot]);path(travelled,'#2463eb',3.4);
+ for(const p of episode.states.slice(0,robot.k+1)){ctx.beginPath();ctx.arc(X(p.x),Y(p.y),2.6,0,2*Math.PI);ctx.fillStyle='#2463eb';ctx.fill();}
+ const currentEvent=episode.events[robot.k];
+ if(currentEvent?.target_pile_id){const target=piles.find(p=>p.id===currentEvent.target_pile_id);if(target){ctx.strokeStyle='#2463eb';ctx.lineWidth=1.6;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(X(target.x),Y(target.y),8,0,2*Math.PI);ctx.stroke();ctx.setLineDash([]);}}
+ const start=piles.find(p=>p.id===comparison.terrain.start_id),goal=piles.find(p=>p.id===comparison.terrain.goal_id);
+ ctx.font='600 11px Avenir, sans-serif';ctx.textAlign='center';
+ for(const [p,text] of [[start,'START'],[goal,'GOAL']]){ctx.fillStyle='#20392d';ctx.fillText(text,X(p.x),Y(p.y)-14);ctx.strokeStyle='#20392d';ctx.lineWidth=1.8;ctx.strokeRect(X(p.x)-4,Y(p.y)-4,8,8);}
+ ctx.beginPath();ctx.arc(X(robot.x),Y(robot.y),7,0,2*Math.PI);ctx.fillStyle='#2463eb';ctx.fill();ctx.strokeStyle='#fcfdf8';ctx.lineWidth=2.5;ctx.stroke();
+ ctx.textAlign='left';ctx.fillStyle='#218849';ctx.font='600 11px Avenir, sans-serif';ctx.fillText('2 m local window',Math.max(10,X(robot.x)-radius*scale+6),Math.max(15,Y(robot.y)-radius*scale-9));
+ ctx.strokeStyle='#59685e';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(w-28-scale,h-22);ctx.lineTo(w-28,h-22);ctx.stroke();ctx.fillStyle='#59685e';ctx.textAlign='center';ctx.fillText('1 m',w-28-scale/2,h-29);
+ const completed=time>=episode.metrics.simulated_time_s-1e-7;
+ $('stateLabel').textContent=completed?(titleStatus[episode.metrics.status]||episode.metrics.status):(time===0?'Ready to replay':playing?'Moving':'Paused');
+ $('decisionValue').textContent=`${Math.min(robot.k+1,episode.events.length)} / ${episode.events.length}`;
+ $('distanceValue').textContent=robot.distance.toFixed(2)+' m';$('visibleValue').textContent=visibleCount;
+ const selected=episode.events.slice(0,robot.k).map(e=>e.target_pile_id).filter(Boolean);
+ $('repeatValue').textContent=selected.length-new Set(selected).size;
+ $('decisionNote').textContent=completed?'Episode finished. Reset, scrub back, or select another terrain.':currentEvent?`At this decision: ${currentEvent.observation.action_mask.filter(Boolean).length} eligible targets. Dashed blue ring marks the selected target.`:'Press Play to inspect each subgoal.';
+ $('clock').textContent=`${time.toFixed(1)} / ${episode.metrics.simulated_time_s.toFixed(1)} s`;
+ $('timeline').value=time;$('step').disabled=completed;
+ canvas.setAttribute('aria-label',`${names[comparison.family]||comparison.family}. Greedy at ${robot.x.toFixed(2)}, ${robot.y.toFixed(2)} metres. ${visibleCount} piles in the green 2 metre observation window. Blue path ${robot.distance.toFixed(2)} metres. ${$('stateLabel').textContent}.`);
+}
+$('play').addEventListener('click',()=>{if(time>=episode.metrics.simulated_time_s)time=0;setPlaying(!playing);draw();});
+$('reset').addEventListener('click',()=>{time=0;setPlaying(false);draw();});
+$('step').addEventListener('click',()=>{setPlaying(false);time=episode.states.find(s=>s.time_s>time+1e-7)?.time_s??episode.metrics.simulated_time_s;draw();});
+$('timeline').addEventListener('input',e=>{setPlaying(false);time=Number(e.target.value);draw();});
+for(const id of ['showWorld','showOracle'])$(id).addEventListener('change',draw);
+$('download').addEventListener('click',()=>{const payload={schema_version:bundle.schema_version,model:bundle.model,assumptions:bundle.assumptions,comparisons:[comparison]};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`${comparison.family}-episodes.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+new ResizeObserver(draw).observe(canvas.parentElement);
+function tick(now){if(playing&&lastFrame!==null){time=Math.min(episode.metrics.simulated_time_s,time+Math.min((now-lastFrame)/1000,.1)*Number($('speed').value));if(time>=episode.metrics.simulated_time_s)setPlaying(false);draw();}lastFrame=now;requestAnimationFrame(tick);}
+choose(0);requestAnimationFrame(tick);
+</script></body></html>

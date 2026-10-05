@@ -10,3 +10,4 @@ dist/
 .env.*
 !.env.example
 outputs/*.log
+outputs/abstract/

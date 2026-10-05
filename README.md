@@ -10,6 +10,26 @@ Follow [AGENTS.md](AGENTS.md) for the contributor-branch workflow. Agents push t
 
 [Interface examples for team review](docs/INTERFACES.md) describe proposed pile and planner/controller messages. They are drafts, not an implemented API.
 
+## Abstract simulator and planner replay
+
+Run the Day-1 abstract simulator, evaluate the greedy and full-map A* planners on the same three layouts, and open the replay:
+
+```sh
+uv run python simulate.py --open
+```
+
+The viewer shows a **light-green 2 m observation circle with a green border** and the **greedy trajectory in blue**. Play, pause, step through decisions, scrub time, switch layouts, and optionally show the full terrain or dashed oracle reference. These overlays are for inspection; the greedy planner receives only its local observation. The marker represents abstract robot position, not animated Go1 locomotion.
+
+`outputs/abstract/replay.html` is a self-contained offline viewer; `outputs/abstract/episodes.json` contains both planners' trajectories, decision observations, masks, outcomes and metrics. Generated runs are ignored by Git and can be reproduced with the command above.
+
+```sh
+uv run python simulate.py --family dead_end --level 0 --seed 1042 --open
+uv run python simulate.py --scene scenes/open_level0_seed1042.json --target P2
+uv run python simulate.py --family open --removal 0.1 --seed 42 --max-gap 0.14
+```
+
+The current model uses provisional geometric movement limits and constant speed. It has no trained controller or foot/contact dynamics. The oracle reaches all three default goals; greedy reaches the open-field goal and times out while revisiting piles on the default moat and dead-end layouts. These are deterministic development examples, not calibrated benchmark results. See [abstract model and validation](docs/ABSTRACT_SIMULATOR.md) for assumptions, interfaces and remaining work.
+
 ## Current build (earlier scene prototype)
 
 - Three terrain families: **open**, **moat**, and **dead-end**.
@@ -86,6 +106,11 @@ assets/unitree_go1/         Pinned robot model, meshes and original license
 src/quadruped_nav/scene.py  Deterministic JSON scene generator
 src/quadruped_nav/mjcf.py   JSON → MJCF builder
 src/quadruped_nav/simulation.py  Stand controller, render and camera utilities
+src/quadruped_nav/abstract.py    Abstract terrain adapter, local observations and movement
+src/quadruped_nav/planners.py    Greedy and full-map A* oracle
+src/quadruped_nav/experiment.py  Paired episodes, metrics and replay export
+src/quadruped_nav/replay.html    Offline interactive replay template
+simulate.py                    Abstract experiment entry point
 scenes/                     Generated sample layouts and portable XML
 outputs/                    Actual MuJoCo renders
 tests/                     Geometry, graph connectivity and physics checks
@@ -95,7 +120,7 @@ tests/                     Geometry, graph connectivity and physics checks
 
 The current specification is [Project Proposal v2](docs/Project_Proposal_v2.pdf) and the [two-week plan](docs/Two-week%20plan%20subgoal%20planning.md). They supersede the September 30 design retained in `docs/` for historical context. Language grounding and execution-aware edge-cost learning are no longer current deliverables.
 
-This first milestone uses native MuJoCo to inspect scene geometry on macOS. **mjlab integration, the height scan, PPO training, the abstract planner simulator, local planners, the learned planner and the goal executor are not implemented.** The JSON layouts and robot asset are reusable inputs for that integration. Proposed terrain difficulty is a hypothesis to calibrate, not demonstrated robot capability.
+The native MuJoCo foundation inspects scene geometry on macOS. The abstract simulator now runs the greedy and full-map oracle planners independently of MuJoCo. **mjlab integration, the height scan, PPO training, the optimistic replanner, the learned planner and the physics goal executor are not implemented.** Proposed terrain difficulty and abstract traversal limits remain hypotheses to calibrate, not demonstrated robot capability.
 
 ## Asset provenance
 

@@ -4,6 +4,8 @@
 
 The complete, valid JSON examples are in [examples/interfaces.json](examples/interfaces.json). The bundle contains separate messages, not one runtime request. They describe one illustrative decision: the robot starts at (0, 0), sees a straight sequence of flat 0.50 m piles separated by 0.03 m gaps, and selects a subgoal 1.59 m ahead toward a destination 8 m away. They are not a complete terrain or benchmark episode.
 
+The Day-1 [abstract simulator](ABSTRACT_SIMULATOR.md) now has internal Python types and a separate replay-log schema. It adapts existing v1 scenes; it does not consume this example bundle or freeze the proposed team contract. Its temporary defaults allow closer-than-1 m recovery targets and use a point-body straight-line support check. These choices are explicit prototype assumptions awaiting controller calibration and team agreement.
+
 ## 1. Coordinate and unit convention
 
 - Use SI units: metres, seconds, radians. World/odometry is right-handed, with +z upward. At zero heading, forward is +x and left is +y.
