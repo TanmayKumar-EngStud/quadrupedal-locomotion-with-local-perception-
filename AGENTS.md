@@ -19,8 +19,8 @@ These instructions apply to every human contributor and AI agent working in this
 
 ## Before every push
 
-1. Check `Goals.md` and update it if today's goals, ownership, status, or time taken changed. Every workday has its own date heading and a four-column table: **Goals | Contributor | Status | Time taken**.
-2. Use an unchecked status (`☐`) for work that is not started, in progress, or awaiting required review, and a checked status (`☑`) only for completed work. Add a brief status description. Use `Not recorded` for unknown durations and `—` for work not started.
+1. Check `Goals.md` and update it if today's goals, ownership, status, or time taken changed. Every workday has its own date heading and a four-column table: **Goals | Contributor | Status | Time taken**. Track substantive project checkpoints, not routine branch creation, tracker maintenance, or other administrative activity.
+2. Keep each Status cell to `[ ]` for incomplete work or `[X]` for completed work, with no status prose or attribution. Work awaiting required review remains unchecked. Use `Not recorded` for unknown durations and `—` for work not started.
 3. Preserve other contributors' entries and previous dates. Add today's section if absent. When carrying work forward, leave the earlier record and add a continuation entry under the new date. Add new actual time only once.
 4. Review the diff and run checks appropriate to the change. Ensure unrelated files, secrets, local environments, and temporary outputs are excluded.
 5. Verify that the current branch belongs to the contributor, then push to that branch on the shared remote. Never push directly to `main` or another contributor's branch unless the human explicitly requests it.
