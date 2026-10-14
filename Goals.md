@@ -30,3 +30,5 @@ H100 cloud setup: dependencies installed on the KTH 10 GB MIG allocation. Initia
 Prepared reproducible 256-world KTH flat/terrain configurations with frequent checkpoints. Flat practice must be evaluated before starting obstacle training; starting a job is not a validated policy.
 
 Cloud diagnostics also exposed CUDA graph capture on an unregistered PyTorch default stream. Warp now owns a capture stream and uses explicit CUDA events to order PyTorch access; Linux CPU tests passed (56). GPU retest pending.
+
+The H100 standing parity check passed with maximum qpos difference 0.0001291. Its line-search budget warning prompted increasing the shared solver line-search limit from 10 to 50 before PPO testing.
