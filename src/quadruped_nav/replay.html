@@ -11,13 +11,13 @@
 <body><main>
 <header><div class="eyebrow">Quadrupedal navigation / Planning study</div><div class="tag">Day 01 · Abstract simulator</div></header>
 <h1>What can the planner see?</h1>
-<p>Follow the greedy planner through a field of piles. Its next target comes only from the green observation window.</p>
-<div class="toolbar"><div class="choices" id="terrainChoices" role="group" aria-label="Terrain layout"></div><div class="checks"><label><input id="showWorld" type="checkbox" checked> Show full terrain</label><label><input id="showOracle" type="checkbox" checked> Oracle reference</label></div></div>
+<p>Follow the greedy planner through a field of piles. Greedy and optimistic choices use only the green observation window and permitted memory.</p>
+<div class="toolbar"><div class="choices" id="terrainChoices" role="group" aria-label="Terrain layout"></div><div class="checks"><label>Planner <select id="plannerChoice" aria-label="Planner to replay"><option value="greedy">Greedy</option><option value="optimistic">Optimistic</option><option value="oracle">Oracle</option></select></label><label><input id="showWorld" type="checkbox" checked> Show full terrain</label><label><input id="showOracle" type="checkbox" checked> Oracle reference</label></div></div>
 <div class="workspace"><section class="map-panel" aria-label="Navigation replay">
 <div class="map-top"><span id="mapLabel">Top view · metres</span><span>+X right · +Y up</span></div>
 <div class="canvas-wrap"><canvas id="map" role="img" aria-label="Top-down replay showing the greedy trajectory in blue and a light-green observation circle with a green border"></canvas></div>
-<div class="legend"><span><i class="swatch coverage"></i>Local coverage · 2 m radius</span><span><i class="swatch"></i>Greedy path</span><span><i class="swatch oracle"></i>Full-map oracle</span></div>
-</section><aside><h2>GREEDY PLANNER</h2><div class="status" id="stateLabel">Ready to replay</div>
+<div class="legend"><span><i class="swatch coverage"></i>Local coverage · 2 m radius</span><span><i class="swatch"></i><span id="pathLegend">Greedy path</span></span><span><i class="swatch oracle"></i>Full-map oracle</span></div>
+</section><aside><h2 id="plannerTitle">GREEDY PLANNER</h2><div class="status" id="stateLabel">Ready to replay</div>
 <div class="metric"><span>Decision</span><strong id="decisionValue">0</strong></div>
 <div class="metric"><span>Distance travelled</span><strong id="distanceValue">0.00 m</strong></div>
 <div class="metric"><span>Visible piles</span><strong id="visibleValue">0</strong></div>
@@ -41,12 +41,12 @@ const names={open:'Open field',moat:'Moat crossing',dead_end:'Dead end'};
 const titleStatus={success:'Goal reached',timeout:'Timed out',no_candidate:'No valid target',planner_no_route:'No route',running:'Moving'};
 function setPlaying(value){playing=value;$('play').textContent=value?'Pause':'Play replay';}
 function choose(i){
- index=i;comparison=bundle.comparisons[i];episode=comparison.episodes.greedy;time=0;setPlaying(false);
+ index=i;comparison=bundle.comparisons[i];episode=comparison.episodes[$('plannerChoice').value]||comparison.episodes.greedy;$('plannerTitle').textContent=$('plannerChoice').value.toUpperCase()+' PLANNER';$('pathLegend').textContent=$('plannerChoice').value+' path';time=0;setPlaying(false);
  for(const [j,button] of [...$('terrainChoices').children].entries())button.setAttribute('aria-pressed',String(j===i));
  $('timeline').max=Math.max(episode.metrics.simulated_time_s,.01);$('timeline').value=0;
  $('mapLabel').textContent=`${names[comparison.family]||comparison.family} · level ${comparison.level} · seed ${comparison.seed}`;
  const m=episode.metrics,o=comparison.episodes.oracle.metrics;
- $('finalResult').textContent=`Greedy: ${titleStatus[m.status]||m.status}. ${m.distance_m.toFixed(2)} m in ${m.simulated_time_s.toFixed(1)} s; ${m.loop_piles} piles selected at least three times.`;
+ $('finalResult').textContent=`${$('plannerChoice').value}: ${titleStatus[m.status]||m.status}. ${m.distance_m.toFixed(2)} m in ${m.simulated_time_s.toFixed(1)} s; ${m.loop_piles} piles selected at least three times.`;
  $('oracleResult').textContent=`Oracle: ${titleStatus[o.status]||o.status}. ${o.distance_m.toFixed(2)} m in ${o.simulated_time_s.toFixed(1)} s.`;
  const l=comparison.limits;
  $('limitsText').textContent=`Provisional limits: ${(l.max_gap_m*100).toFixed(0)} cm centreline gaps, ${(l.max_height_step_m*100).toFixed(0)} cm height steps, ${l.speed_m_s} m/s, ${l.subgoal_budget_s} s per subgoal, ${l.episode_budget_s} s per episode. No training is performed in this viewer.`;
@@ -109,8 +109,9 @@ function draw(){
  $('decisionNote').textContent=completed?'Episode finished. Reset, scrub back, or select another terrain.':currentEvent?`At this decision: ${currentEvent.observation.action_mask.filter(Boolean).length} eligible targets. Dashed blue ring marks the selected target.`:'Press Play to inspect each subgoal.';
  $('clock').textContent=`${time.toFixed(1)} / ${episode.metrics.simulated_time_s.toFixed(1)} s`;
  $('timeline').value=time;$('step').disabled=completed;
- canvas.setAttribute('aria-label',`${names[comparison.family]||comparison.family}. Greedy at ${robot.x.toFixed(2)}, ${robot.y.toFixed(2)} metres. ${visibleCount} piles in the green 2 metre observation window. Blue path ${robot.distance.toFixed(2)} metres. ${$('stateLabel').textContent}.`);
+ canvas.setAttribute('aria-label',`${names[comparison.family]||comparison.family}. ${$('plannerChoice').value} at ${robot.x.toFixed(2)}, ${robot.y.toFixed(2)} metres. ${visibleCount} piles in the green 2 metre observation window. Blue path ${robot.distance.toFixed(2)} metres. ${$('stateLabel').textContent}.`);
 }
+$('plannerChoice').addEventListener('change',()=>choose(index));
 $('play').addEventListener('click',()=>{if(time>=episode.metrics.simulated_time_s)time=0;setPlaying(!playing);draw();});
 $('reset').addEventListener('click',()=>{time=0;setPlaying(false);draw();});
 $('step').addEventListener('click',()=>{setPlaying(false);time=episode.states.find(s=>s.time_s>time+1e-7)?.time_s??episode.metrics.simulated_time_s;draw();});

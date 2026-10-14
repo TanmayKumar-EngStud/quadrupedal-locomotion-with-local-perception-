@@ -3,6 +3,7 @@ from pathlib import Path
 import math
 import os
 import xml.etree.ElementTree as ET
+from .terrain import surface_normal
 
 ROOT = Path(__file__).resolve().parents[2]
 COLOURS = {"red": "0.93 0.25 0.18 1", "blue": "0.08 0.48 0.95 1", "yellow": "1 0.70 0.10 1"}
@@ -39,10 +40,21 @@ def build_mjcf(scene, output):
         platform = node["id"].startswith("P")
         colour = "0.24 0.65 0.58 1" if node["id"] == "P0" else "0.28 0.45 0.56 1" if platform else "0.48 0.55 0.61 1"
         height = depth + node["z_top"]
-        ET.SubElement(world, "geom", name=node["id"], type="box", pos=f"{node['x']} {node['y']} {node['z_top']-height/2}", size=f"{node['size']/2} {node['size']/2} {height/2}", rgba=colour, friction="0.9 0.02 0.002", group="0")
+        roll, pitch = node.get("roll",0.), node.get("pitch",0.)
+        friction = f"{node.get('friction',.9)} 0.02 0.002"
+        if roll or pitch:
+            normal = surface_normal(roll,pitch)
+            centre = [node['x']-.04*normal[0],node['y']-.04*normal[1],node['z_top']-.04*normal[2]]
+            ET.SubElement(world,"geom",name=node['id'],type="box",pos=" ".join(map(str,centre)),
+                          size=f"{node['size']/2} {node['size']/2} .04",euler=f"{roll} {pitch} 0",rgba=colour,friction=friction,group="0")
+        else:
+            ET.SubElement(world, "geom", name=node["id"], type="box", pos=f"{node['x']} {node['y']} {node['z_top']-height/2}", size=f"{node['size']/2} {node['size']/2} {height/2}", rgba=colour, friction=friction, group="0")
         if platform:
             # Thin non-colliding target ring, entirely inside the platform.
             ET.SubElement(world, "site", name=f"label_{node['id']}", type="sphere", pos=f"{node['x']} {node['y']} 0.012", size="0.025", rgba="0.7 1 0.93 1", group="4")
+    for obstacle in scene.get("obstacles",[]):
+        height = depth+obstacle['z_top']
+        ET.SubElement(world,"geom",name=obstacle['id'],type="box",pos=f"{obstacle['x']} {obstacle['y']} {obstacle['z_top']-height/2}",size=f"{obstacle['size_x']/2} {obstacle['size_y']/2} {height/2}",rgba=".65 .32 .18 1",group="0")
     for landmark in scene["landmarks"]:
         x,y,z = landmark["x"],landmark["y"],landmark["z_base"]
         ET.SubElement(world, "geom", name=f"{landmark['id']}_plinth", type="cylinder", pos=f"{x} {y} {z-0.04}", size="0.18 0.04", rgba="0.17 0.23 0.29 1", contype="0", conaffinity="0", group="1")

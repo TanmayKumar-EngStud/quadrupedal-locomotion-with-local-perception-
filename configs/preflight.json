@@ -1,0 +1,1 @@
+{"env":{"family":"flat","num_envs":32,"backend":"warp","device":"cuda:0","curriculum":"none","noise":0.0},"updates":2,"rollout_steps":16,"epochs":2,"minibatch_size":128,"checkpoint_every":1,"output":"runs/gpu-preflight"}

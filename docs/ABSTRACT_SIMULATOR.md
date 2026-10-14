@@ -1,5 +1,7 @@
 # Abstract simulator — Day 1
 
+Historical Day-1 design note. The October 14 implementation also includes the optimistic and learned planners, controller training and physics execution; see [current status](IMPLEMENTATION_STATUS.md) and [runbook](RUNBOOK.md). The deterministic baseline below remains available. The adapter now accepts roll/pitch with an approximate conservative footprint; arbitrary yaw rotations are still rejected.
+
 Run `uv run python simulate.py --open` from the repository root. This runs paired oracle/greedy episodes on open, moat and dead-end layouts, then opens the generated offline replay. No MuJoCo import, GPU, browser network connection or trained policy is needed for the abstract run. The command is also available as `uv run python -m quadruped_nav.experiment`.
 
 ## Components

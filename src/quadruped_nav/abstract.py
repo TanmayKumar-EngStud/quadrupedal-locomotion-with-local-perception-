@@ -16,6 +16,8 @@ class Pile:
     y: float
     z: float
     size: float
+    roll: float = 0.0
+    pitch: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -48,7 +50,7 @@ class Terrain:
         if not math.isfinite(self.start_heading):
             raise ValueError("Start heading must be finite")
         for p in self.piles:
-            if not all(math.isfinite(v) for v in (p.x, p.y, p.z, p.size)) or p.size <= 0:
+            if not all(math.isfinite(v) for v in (p.x, p.y, p.z, p.size,p.roll,p.pitch)) or p.size <= 0 or max(abs(p.roll),abs(p.pitch))>math.pi/4:
                 raise ValueError("Pile geometry must be finite with positive size")
 
     @classmethod
@@ -60,10 +62,10 @@ class Terrain:
             return "pile_" + blake2s(source_id.encode(), digest_size=8).hexdigest()
         records = scene["stones"] + scene["platforms"]
         for record in records:
-            if any(record.get(key, 0) != 0 for key in ("roll", "pitch", "yaw")):
-                raise ValueError("The initial abstract model supports horizontal, axis-aligned piles only")
+            if record.get('yaw',0)!=0:
+                raise ValueError("Yaw-rotated pile footprints are not supported")
         piles = tuple(Pile(opaque(p["id"]), float(p["x"]), float(p["y"]),
-                           float(p["z_top"]), float(p["size"])) for p in records)
+                           float(p["z_top"]), float(p["size"]),float(p.get('roll',0)),float(p.get('pitch',0))) for p in records)
         return cls(piles, opaque(scene["start"]["platform"]), opaque(target),
                    float(scene["start"].get("heading", 0)))
 
@@ -99,7 +101,9 @@ def straight_approach(start: Pile, target: Pile, supports: Sequence[Pile], limit
     if length < 1e-9:
         return False
     centres = np.array([(p.x, p.y) for p in supports])
-    halves = np.array([p.size / 2 for p in supports])[:, None]
+    # Conservative inscribed square for tilted top footprints; no claim of
+    # exact contact geometry in the abstract surrogate.
+    halves = np.array([p.size / 2 * min(math.cos(p.roll),math.cos(p.pitch)) for p in supports])[:, None]
     delta = np.array([target.x - start.x, target.y - start.y])
     origin = np.array([start.x, start.y])
     low, high = centres - halves, centres + halves
@@ -193,7 +197,7 @@ class AbstractEnv:
                            (current.x, current.y, current.z + .3), self.yaw,
                            local(goal.x, goal.y), self.limits.observation_radius_m,
                            tuple(VisiblePile(p.id, (*local(p.x, p.y), p.z-current.z-.3),
-                                             (p.size, p.size)) for p in visible), mask)
+                                             (p.size, p.size),local_normal(p,self.yaw)) for p in visible), mask)
 
     def step(self, target_id: str | None):
         if self.status != "running":
@@ -230,3 +234,23 @@ class AbstractEnv:
         self.events.append(event)
         self.states.append(self.state())
         return self.observe(), self.status != "running"
+
+
+def local_normal(pile,yaw):
+    from .terrain import surface_normal
+    n=surface_normal(pile.roll,pile.pitch);c,s=math.cos(yaw),math.sin(yaw)
+    return float(c*n[0]+s*n[1]),float(-s*n[0]+c*n[1]),float(n[2])
+
+
+def observe_pose(terrain,limits,position,yaw,decision_index=0,time_s=0):
+    """Planner observation at the actual continuous physics pose (not snapped)."""
+    x,y,z=map(float,position);c,s=math.cos(yaw),math.sin(yaw)
+    support=min(terrain.piles,key=lambda p:math.hypot(p.x-x,p.y-y))
+    current=Pile(support.id,x,y,support.z,support.size,support.roll,support.pitch)
+    visible=tuple(sorted((p for p in terrain.piles if math.hypot(p.x-x,p.y-y)<=limits.observation_radius_m+1e-9),key=lambda p:p.id))
+    def local(px,py):return c*(px-x)+s*(py-y),-s*(px-x)+c*(py-y)
+    candidates=tuple(math.hypot(p.x-x,p.y-y)>.25 and math.hypot(p.x-x,p.y-y)<=limits.max_subgoal_m and
+                     straight_approach(current,p,visible,limits) for p in visible)
+    goal=next(p for p in terrain.piles if p.id==terrain.goal_id)
+    return Observation(decision_index,time_s,support.id,(x,y,z),yaw,local(goal.x,goal.y),limits.observation_radius_m,
+                       tuple(VisiblePile(p.id,(*local(p.x,p.y),p.z-z),(p.size,p.size),local_normal(p,yaw)) for p in visible),candidates)

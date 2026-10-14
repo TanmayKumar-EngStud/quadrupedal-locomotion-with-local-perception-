@@ -11,3 +11,11 @@ dist/
 !.env.example
 outputs/*.log
 outputs/abstract/
+runs/
+artifacts/
+tmp/
+outputs/evaluation/
+outputs/benchmarks/
+outputs/calibration/
+MUJOCO_LOG.TXT
+outputs/terrains/

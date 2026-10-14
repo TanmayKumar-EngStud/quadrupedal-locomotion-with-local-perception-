@@ -10,6 +10,33 @@ Follow [AGENTS.md](AGENTS.md) for the contributor-branch workflow. Agents push t
 
 [Interface examples for team review](docs/INTERFACES.md) describe proposed pile and planner/controller messages. They are drafts, not an implemented API.
 
+## Train in the cloud and run locally
+
+The current implementation includes a PPO goal-reaching controller pipeline, native MuJoCo and NVIDIA MuJoCo Warp backends, four planner types, twenty-row terrain generation, checkpoint export, physics execution and paired benchmarks. **No trained walking policy is included. GPU preflight and long training remain to be run on the H100/A100.**
+
+- [Manual (PDF)](output/pdf/Manual.pdf): architecture, theory, rewards, important functions and operating instructions.
+- [Runbook](docs/RUNBOOK.md): exact setup, training, download and local execution commands.
+- [Implementation status](docs/IMPLEMENTATION_STATUS.md): tested scope, proposal differences and research limitations.
+
+```sh
+uv sync --extra train --frozen
+uv run --extra train pytest -q
+uv run --extra train quad-train --config configs/smoke.json
+```
+
+On the Linux GPU instance, run `bash scripts/cloud_setup.sh` before a long job. The tiny smoke/preflight checkpoints only validate plumbing; they are not usable walking policies. Then train with `configs/cloud.json`, export a bundle, download it and run locally:
+
+```sh
+uv run --extra train python play.py --checkpoint artifacts/controller/controller.pt --planner optimistic --family open --row 0
+```
+
+New terrain families: flat, open, holes, moat, dead end, steps, rough heights, slalom walls, narrow bridge and slanted tops. Create a scene and inspect it with the existing viewer:
+
+```sh
+uv run python -m quadruped_nav.terrain --family slalom --row 5 --seed 42
+uv run python view.py --scene outputs/terrains/slalom_row5_seed42.json
+```
+
 ## Abstract simulator and planner replay
 
 Run the Day-1 abstract simulator, evaluate the greedy and full-map A* planners on the same three layouts, and open the replay:
@@ -30,7 +57,7 @@ uv run python simulate.py --family open --removal 0.1 --seed 42 --max-gap 0.14
 
 The current model uses provisional geometric movement limits and constant speed. It has no trained controller or foot/contact dynamics. The oracle reaches all three default goals; greedy reaches the open-field goal and times out while revisiting piles on the default moat and dead-end layouts. These are deterministic development examples, not calibrated benchmark results. See [abstract model and validation](docs/ABSTRACT_SIMULATOR.md) for assumptions, interfaces and remaining work.
 
-## Current build (earlier scene prototype)
+## Earlier scene prototype (still available)
 
 - Three terrain families: **open**, **moat**, and **dead-end**.
 - Ten difficulty levels, interpolating the proposal's stone size/gap anchors: level 0 = 46/4 cm, level 5 = 26/9 cm, level 9 = 10/13 cm.
@@ -40,7 +67,7 @@ The current model uses provisional geometric movement limits and constant speed.
 - Official Menagerie Go1 meshes, collision geometry and 12 position actuators.
 - An interactive viewer, reproducible renders and physics/connectivity checks.
 
-**The robot currently holds a standing pose using joint position servos. It does not yet walk, follow language instructions or execute routes.** This build establishes the scene and robot assets for the subsequent controller, grounding and planner work. No trained policy or training result is claimed.
+**The original viewer holds a standing pose using joint position servos. Use play.py with a trained checkpoint for planner-driven execution; no language interface is part of the current scope.** This viewer remains useful for scene inspection. No trained locomotion result is claimed.
 
 ## Run
 
@@ -120,7 +147,7 @@ tests/                     Geometry, graph connectivity and physics checks
 
 The current specification is [Project Proposal v2](docs/Project_Proposal_v2.pdf) and the [two-week plan](docs/Two-week%20plan%20subgoal%20planning.md). They supersede the September 30 design retained in `docs/` for historical context. Language grounding and execution-aware edge-cost learning are no longer current deliverables.
 
-The native MuJoCo foundation inspects scene geometry on macOS. The abstract simulator now runs the greedy and full-map oracle planners independently of MuJoCo. **mjlab integration, the height scan, PPO training, the optimistic replanner, the learned planner and the physics goal executor are not implemented.** Proposed terrain difficulty and abstract traversal limits remain hypotheses to calibrate, not demonstrated robot capability.
+The implementation now supplies the controller/planner training and execution pipeline. It uses direct MuJoCo Warp rather than mjlab, elevation-raster sensing rather than runtime ray casting, and a global-batch curriculum. See the implementation status for all differences. Proposed terrain difficulty and abstract traversal limits remain hypotheses to calibrate, not demonstrated robot capability.
 
 ## Asset provenance
 

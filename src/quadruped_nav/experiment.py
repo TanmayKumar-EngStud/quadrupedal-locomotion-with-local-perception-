@@ -10,11 +10,12 @@ from pathlib import Path
 import webbrowser
 
 from .abstract import AbstractEnv, Limits, Terrain
-from .planners import GreedyPlanner, OraclePlanner, Planner
+from .planners import GreedyPlanner, OraclePlanner, OptimisticPlanner, Planner
 from .scene import FAMILIES, generate_scene, load_scene
 
 
 def run_episode(env: AbstractEnv, planner: Planner, name: str, oracle_distance_m: float | None = None):
+    if hasattr(planner,'reset'):planner.reset()
     observation = env.reset()
     while env.status == "running":
         observation, _ = env.step(planner.select_subgoal(observation))
@@ -47,12 +48,13 @@ def run_comparison(scene: dict, limits: Limits | None = None, target: str = "P2"
                              for a, b in zip(route, route[1:])) if route else None
     oracle_result = run_episode(oracle_env, oracle, "oracle", reference_distance)
     greedy_result = run_episode(AbstractEnv(terrain, limits), GreedyPlanner(), "greedy", reference_distance)
+    optimistic_result = run_episode(AbstractEnv(terrain, limits), OptimisticPlanner(max_gap=limits.max_gap_m), "optimistic", reference_distance)
     return {
         "family": scene.get("family", "custom"), "level": scene.get("level"), "seed": scene.get("seed"),
         "target_source_id": target,
         "terrain": asdict(terrain), "limits": asdict(limits),
         "oracle_reference": [asdict(nodes[node]) for node in route],
-        "episodes": {"greedy": greedy_result, "oracle": oracle_result},
+        "episodes": {"greedy": greedy_result, "oracle": oracle_result, "optimistic":optimistic_result},
     }
 
 

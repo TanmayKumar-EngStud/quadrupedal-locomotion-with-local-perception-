@@ -1,0 +1,1 @@
+{"env":{"family":"flat","num_envs":2,"backend":"native","device":"cpu","curriculum":"none","noise":0.0},"updates":2,"rollout_steps":16,"epochs":2,"minibatch_size":32,"hidden":[64,64],"checkpoint_every":1,"terrain_every":100,"output":"runs/smoke"}
