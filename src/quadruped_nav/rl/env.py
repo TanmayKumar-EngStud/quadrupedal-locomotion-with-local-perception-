@@ -75,7 +75,7 @@ class GoalEnv:
         self.model.geom_margin[:]=0
         self.model.pair_margin[:]=0
         self.model.opt.timestep=cfg.sim_dt
-        self.model.opt.iterations=10;self.model.opt.ls_iterations=50
+        self.model.opt.iterations=100;self.model.opt.ls_iterations=50
         self.model.opt.jacobian=mujoco.mjtJacobian.mjJAC_DENSE
         self.model.actuator_gainprm[:,0]=cfg.kp
         self.model.actuator_biasprm[:,1]=-cfg.kp;self.model.actuator_biasprm[:,2]=-cfg.kd

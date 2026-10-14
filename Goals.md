@@ -32,3 +32,5 @@ Prepared reproducible 256-world KTH flat/terrain configurations with frequent ch
 Cloud diagnostics also exposed CUDA graph capture on an unregistered PyTorch default stream. Warp now owns a capture stream and uses explicit CUDA events to order PyTorch access; Linux CPU tests passed (56). GPU retest pending.
 
 The H100 standing parity check passed with maximum qpos difference 0.0001291. Its line-search budget warning prompted increasing the shared solver line-search limit from 10 to 50 before PPO testing.
+
+The H100 completed two PPO updates and wrote a checkpoint (1,024 transitions). Random-action testing exposed the main solver iteration limit as well; increased it to MuJoCo's 100-iteration budget before the long run. Final standing difference was 3.42e-6.
