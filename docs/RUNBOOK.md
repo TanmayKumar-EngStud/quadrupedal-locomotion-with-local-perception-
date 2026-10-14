@@ -108,3 +108,17 @@ Calibration measures short-target arrival on open/rough/slanted scenes and saves
 4. A downloaded checkpoint produces the same CPU actions as the exported actor for saved observations; compare native/Warp episode statistics.
 5. Run held-out paired layouts with oracle, greedy, optimistic and learned planners. Record falls, timeouts, loop behaviour and actual paths.
 6. Report failures and scope changes. Do not claim robot competence, a successful curriculum or the research hypotheses from smoke tests alone.
+
+## KTH H100 10 GB MIG allocation
+
+The observed KTH allocation is one 10 GB MIG slice, not the whole H100. Use `configs/kth-flat.json` for 256 parallel worlds, 2,000 flat-ground updates (16,384,000 transitions), and checkpoints every 10 updates. The terrain configuration uses the same batch size and 4,000 updates (32,768,000 transitions), so it has a smaller sample budget than the default 1,024-world experiment. Do not mix these budgets in a curriculum comparison.
+
+After GPU preflight and a short PPO test pass, start the flat run in a persistent terminal or with `nohup`. Save output to `runs/kth-flat.log`; checkpoints go to `runs/kth-flat-seed0`. Closing a browser tab does not necessarily stop a detached process, but stopping or recycling the KTH Jupyter server does. Keep backups of checkpoints outside that server.
+
+```sh
+uv run --extra cloud quad-train --config configs/kth-flat.json
+# Only after inspecting a successful flat policy:
+uv run --extra cloud quad-train --config configs/kth-terrain.json --warm-start runs/kth-flat-seed0/last.pt
+```
+
+GoalEnv clears collision margins on both CPU and GPU because Warp MULTICCD rejects the Go1 asset's original nonzero margins. Multi-contact collision remains enabled. Warp currently warns that capsule-cylinder pairs receive at most one contact; this must be considered in native/GPU validation.

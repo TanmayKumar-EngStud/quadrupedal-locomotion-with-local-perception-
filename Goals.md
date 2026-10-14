@@ -26,3 +26,5 @@ The MuJoCo scene/viewer predates this workday. The initial abstract simulator no
 CPU verification: 56 tests passed; short PPO, export/reload, learned-planner and physics execution runs completed. CUDA execution and trained locomotion quality remain unverified locally. See [implementation status](docs/IMPLEMENTATION_STATUS.md) and the [manual](output/pdf/Manual.pdf).
 
 H100 cloud setup: dependencies installed on the KTH 10 GB MIG allocation. Initial preflight exposed a MULTICCD/nonzero-margin incompatibility; both native and Warp task models now use zero collision margins. GPU validation and training remain in progress.
+
+Prepared reproducible 256-world KTH flat/terrain configurations with frequent checkpoints. Flat practice must be evaluated before starting obstacle training; starting a job is not a validated policy.
