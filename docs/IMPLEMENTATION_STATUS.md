@@ -1,6 +1,6 @@
 # Implementation status — October 14, 2026
 
-The executable project pipeline is implemented, but long training and research validation are pending. No pretrained walking policy is included. The Mac can verify native physics, PPO updates, serialization and planner logic; it cannot certify CUDA kernels or H100/A100 performance.
+The executable project pipeline is implemented. KTH H100 10 GB MIG preflight, a 256-world PPO smoke run, checkpoint saving and GPU-checkpoint CPU execution have passed. The flat-ground training job has started; completed training and research validation are pending. No validated walking policy is included. See the KTH section of RUNBOOK.md for run locations and sample budgets.
 
 ## Delivered
 
@@ -18,7 +18,7 @@ The executable project pipeline is implemented, but long training and research v
 
 | Proposal | Implemented choice / implication |
 | --- | --- |
-| mjlab task framework | Direct MuJoCo Warp + PyTorch. Same simulator family, different task/training integration; CUDA execution still needs cloud validation. |
+| mjlab task framework | Direct MuJoCo Warp + PyTorch. Same simulator family, different task/training integration; CUDA smoke execution was validated on the KTH H100 MIG allocation; long-run locomotion validation is pending. |
 | Ray-cast scan | Perfect precomputed elevation raster, following the actual Lab 1 approach. Sampled heights are checked against MuJoCo rays on tilted tops. No dynamic-object sensing or real perception. |
 | Per-world smooth curriculum | One global row/family per batch, refreshed at rollout boundaries. Promotion/demotion uses aggregate outcomes; uniform uses one sampled row. Document this in RQ1. |
 | Symmetry augmentation | Actor reflection consistency regularizer, not augmented PPO likelihood samples. |
@@ -31,6 +31,7 @@ The original proposal/planner documents are preserved unchanged. This status fil
 
 ## Important limitations to address in experiments
 
+- The Go1 task uses zero collision margins for Warp compatibility, with 100 solver iterations and 50 line-search iterations on both backends. Warp warns that capsule-cylinder pairs receive at most one contact.
 - All parallel GPU worlds share terrain geometry within a batch; random poses, commands and policy noise provide diversity, with scene reseeding across batches. This may reduce sample efficiency.
 - Random short targets are not guaranteed physically reachable on difficult layouts. Train on easy terrain first, inspect failures and tune weights/limits before increasing difficulty.
 - Foot-contact/clearance reward signals use elevation proximity, not exact contact impulses. The simulator itself still resolves physical contacts.

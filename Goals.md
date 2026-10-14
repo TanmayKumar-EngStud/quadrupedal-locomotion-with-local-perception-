@@ -20,17 +20,10 @@ The MuJoCo scene/viewer predates this workday. The initial abstract simulator no
 | --- | --- | --- | --- |
 | Implement controller/planner training, expanded terrains, checkpoint export and local physics execution; validate the CPU pipeline | Tanmay | [X] | 33 min agent elapsed (implementation, smoke runs, tests and documentation; publishing excluded) |
 | Deliver the project manual with architecture, concepts, important functions and cloud-to-local instructions | Tanmay | [X] | Included in pipeline work above |
-| Run H100/A100 preflight, measure throughput/memory and train/validate the locomotion controller | Tanmay, Amedeo, Damien | [ ] | — |
+| Verify H100 GPU physics, PPO updates and GPU-checkpoint CPU loading | Tanmay | [X] | Not recorded |
+| Train and validate the locomotion controller on the KTH GPU | Tanmay, Amedeo, Damien | [ ] | In progress; job elapsed time is separate from contributor time |
 | Freeze a validated controller, calibrate transitions and complete held-out physics experiments | Tanmay, Amedeo, Damien | [ ] | — |
 
-CPU verification: 56 tests passed; short PPO, export/reload, learned-planner and physics execution runs completed. CUDA execution and trained locomotion quality remain unverified locally. See [implementation status](docs/IMPLEMENTATION_STATUS.md) and the [manual](output/pdf/Manual.pdf).
+CPU verification: 56 tests passed locally and on the KTH Linux server. H100 10 GB MIG validation passed: standing CPU/GPU maximum qpos difference 3.42e-6; 256-world PPO smoke run completed 16,384 transitions and saved a checkpoint; that checkpoint loaded and ran in native CPU physics. The final batch smoke log had no solver-limit, capacity or traceback errors. Warp warns that capsule-cylinder collisions provide at most one contact.
 
-H100 cloud setup: dependencies installed on the KTH 10 GB MIG allocation. Initial preflight exposed a MULTICCD/nonzero-margin incompatibility; both native and Warp task models now use zero collision margins. GPU validation and training remain in progress.
-
-Prepared reproducible 256-world KTH flat/terrain configurations with frequent checkpoints. Flat practice must be evaluated before starting obstacle training; starting a job is not a validated policy.
-
-Cloud diagnostics also exposed CUDA graph capture on an unregistered PyTorch default stream. Warp now owns a capture stream and uses explicit CUDA events to order PyTorch access; Linux CPU tests passed (56). GPU retest pending.
-
-The H100 standing parity check passed with maximum qpos difference 0.0001291. Its line-search budget warning prompted increasing the shared solver line-search limit from 10 to 50 before PPO testing.
-
-The H100 completed two PPO updates and wrote a checkpoint (1,024 transitions). Random-action testing exposed the main solver iteration limit as well; increased it to MuJoCo's 100-iteration budget before the long run. Final standing difference was 3.42e-6.
+Cloud fixes use zero collision margins, an explicitly synchronized Warp-owned CUDA stream, and solver budgets of 100 iterations / 50 line-search iterations. Reproducible KTH configs are committed. The flat training run is active at `runs/kth-flat-seed0`, configured for 2,000 updates / 16,384,000 transitions; update 10 checkpoint creation was verified. Early throughput was about 6,000 samples/s and allocated GPU usage about 962 MiB. These are startup observations, not a final performance benchmark or evidence of successful walking. Export is queued after successful completion; terrain training has not started. See [runbook](docs/RUNBOOK.md) and [implementation status](docs/IMPLEMENTATION_STATUS.md).

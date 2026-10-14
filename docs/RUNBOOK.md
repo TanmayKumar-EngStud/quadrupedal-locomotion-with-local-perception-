@@ -122,3 +122,20 @@ uv run --extra cloud quad-train --config configs/kth-terrain.json --warm-start r
 ```
 
 GoalEnv clears collision margins on both CPU and GPU because Warp MULTICCD rejects the Go1 asset's original nonzero margins. Multi-contact collision remains enabled. Warp currently warns that capsule-cylinder pairs receive at most one contact; this must be considered in native/GPU validation.
+
+### First KTH training launch — October 14, 2026
+
+The first flat-ground job is detached from the browser terminal and uses `configs/kth-flat.json`. Its PID is recorded in `runs/kth-flat.pid`, its log in `runs/kth-flat.log`, and its latest checkpoint in `runs/kth-flat-seed0/last.pt`. A checkpoint was verified at update 10. Initial throughput was about 6,000 samples/s and observed MIG memory usage 962 MiB; these are not steady-state benchmark results. The completed 256-world smoke run had no solver-limit or capacity errors, and its checkpoint ran in native CPU physics.
+
+After successful training, the launch wrapper exports `artifacts/kth-flat-controller.zip`. When the wrapper finishes, `runs/kth-flat.exit` records its exit code (`0` means both training and export succeeded). The bundle is not automatically downloaded to the laptop. A saved/exported checkpoint still needs movement evaluation before obstacle training. The manual PDF predates these GPU checks; this runbook and IMPLEMENTATION_STATUS.md contain the current validation status.
+
+To inspect progress from the project terminal:
+
+```sh
+tail -5 runs/kth-flat.log
+ls -lh runs/kth-flat-seed0/last.pt
+# When present, inspect completion status:
+cat runs/kth-flat.exit
+```
+
+Do not start a duplicate run in the same output folder. Keep the KTH server running; a server shutdown/restart interrupts the job. If interrupted, resume with the same flat config and `--resume runs/kth-flat-seed0/last.pt` after confirming the previous process has stopped.
