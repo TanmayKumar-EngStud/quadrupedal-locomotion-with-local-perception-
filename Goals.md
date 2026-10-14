@@ -28,3 +28,5 @@ CPU verification: 56 tests passed; short PPO, export/reload, learned-planner and
 H100 cloud setup: dependencies installed on the KTH 10 GB MIG allocation. Initial preflight exposed a MULTICCD/nonzero-margin incompatibility; both native and Warp task models now use zero collision margins. GPU validation and training remain in progress.
 
 Prepared reproducible 256-world KTH flat/terrain configurations with frequent checkpoints. Flat practice must be evaluated before starting obstacle training; starting a job is not a validated policy.
+
+Cloud diagnostics also exposed CUDA graph capture on an unregistered PyTorch default stream. Warp now owns a capture stream and uses explicit CUDA events to order PyTorch access; Linux CPU tests passed (56). GPU retest pending.

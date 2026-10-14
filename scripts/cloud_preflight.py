@@ -14,5 +14,5 @@ for _ in range(25):
 native.backend.check();gpu.backend.check()
 error=float((native.backend.tensor('qpos')-gpu.backend.tensor('qpos').cpu()).abs().max())
 print(json.dumps({'standing_qpos_max_difference':error}))
-if error>.05:raise SystemExit('CPU/GPU standing parity exceeds 0.05. Investigate before training.')
+if not torch.isfinite(gpu.backend.tensor('qpos')).all() or error>.05:raise SystemExit('CPU/GPU standing parity exceeds 0.05. Investigate before training.')
 print('Standing parity passed. Next: quad-train --config configs/preflight.json')

@@ -1,4 +1,5 @@
 """One state interface for CPU MuJoCo and batched NVIDIA MuJoCo Warp."""
+from contextlib import contextmanager
 import numpy as np
 import mujoco
 import torch
@@ -37,26 +38,37 @@ class WarpBackend:
         import mujoco_warp as mjw
         self.wp,self.mjw,self.model,self.device=wp,mjw,model,device
         wp.init()
-        # Both frameworks share the same CUDA stream to preserve tensor/kernel ordering.
-        self.stream=wp.stream_from_torch(torch.cuda.current_stream(device))
-        with wp.ScopedStream(self.stream):
+        # Capture needs a registered non-default Warp stream. Explicit CUDA
+        # events order tensor writes and simulator kernels across frameworks.
+        self.stream=wp.Stream(device=device)
+        self.torch_stream=wp.stream_to_torch(self.stream)
+        with self.scope():
             self.m=mjw.put_model(model)
             self.d=mjw.make_data(model,nworld=count,nconmax=nconmax,njmax=njmax)
         self.graphs={}
+
+    @contextmanager
+    def scope(self):
+        current=torch.cuda.current_stream(self.device)
+        self.torch_stream.wait_stream(current)
+        with torch.cuda.stream(self.torch_stream), self.wp.ScopedStream(self.stream):
+            yield
+        current.wait_stream(self.torch_stream)
 
     def tensor(self,name):
         return self.wp.to_torch(getattr(self.d,name))
 
     def reset(self,ids,qpos):
-        self.tensor("qpos")[ids]=qpos
-        for name in ("qvel","qacc","qacc_warmstart","qfrc_applied","xfrc_applied","time"):
-            self.tensor(name)[ids]=0
-        self.tensor("ctrl")[ids]=qpos[:,7:]
-        with self.wp.ScopedStream(self.stream): self.mjw.forward(self.m,self.d)
+        with self.scope():
+            self.tensor("qpos")[ids]=qpos
+            for name in ("qvel","qacc","qacc_warmstart","qfrc_applied","xfrc_applied","time"):
+                self.tensor(name)[ids]=0
+            self.tensor("ctrl")[ids]=qpos[:,7:]
+            self.mjw.forward(self.m,self.d)
 
     def step(self,targets,substeps):
-        self.tensor("ctrl").copy_(targets)
-        with self.wp.ScopedStream(self.stream):
+        with self.scope():
+            self.tensor("ctrl").copy_(targets)
             if substeps not in self.graphs:
                 # Compile outside CUDA capture, then restore the physical state:
                 # warming must not add an unrequested integration step.
@@ -65,7 +77,7 @@ class WarpBackend:
                 for name,value in saved.items():self.tensor(name).copy_(value)
                 self.mjw.forward(self.m,self.d)
                 # Capture itself does not execute; launch once for this step.
-                with self.wp.ScopedCapture() as capture:
+                with self.wp.ScopedCapture(stream=self.stream) as capture:
                     for _ in range(substeps): self.mjw.step(self.m,self.d)
                 self.graphs[substeps]=capture.graph
             self.wp.capture_launch(self.graphs[substeps])
