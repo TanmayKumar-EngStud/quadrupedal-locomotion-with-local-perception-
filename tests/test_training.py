@@ -34,6 +34,7 @@ def test_new_terrains_compile_and_are_reproducible(family,tmp_path):
 
 def test_observations_actions_and_rewards_have_frozen_contract():
     env=GoalEnv(EnvConfig(num_envs=2,noise=0))
+    assert np.all(env.model.geom_margin==0) and np.all(env.model.pair_margin==0)
     obs,critic=env.observations(False)
     assert obs.shape==(2,873) and critic.shape==(2,876)
     assert torch.isfinite(obs).all()

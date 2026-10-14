@@ -24,3 +24,5 @@ The MuJoCo scene/viewer predates this workday. The initial abstract simulator no
 | Freeze a validated controller, calibrate transitions and complete held-out physics experiments | Tanmay, Amedeo, Damien | [ ] | — |
 
 CPU verification: 56 tests passed; short PPO, export/reload, learned-planner and physics execution runs completed. CUDA execution and trained locomotion quality remain unverified locally. See [implementation status](docs/IMPLEMENTATION_STATUS.md) and the [manual](output/pdf/Manual.pdf).
+
+H100 cloud setup: dependencies installed on the KTH 10 GB MIG allocation. Initial preflight exposed a MULTICCD/nonzero-margin incompatibility; both native and Warp task models now use zero collision margins. GPU validation and training remain in progress.

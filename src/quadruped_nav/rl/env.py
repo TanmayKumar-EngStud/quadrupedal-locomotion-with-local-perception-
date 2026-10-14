@@ -70,6 +70,10 @@ class GoalEnv:
         self.scene=scene if scene is not None else generate_terrain(cfg.family,cfg.row,cfg.seed)
         with tempfile.TemporaryDirectory() as temp:
             self.model=mujoco.MjModel.from_xml_path(str(build_mjcf(self.scene,Path(temp)/'scene.xml')))
+        # Warp MULTICCD requires zero collision margins. Apply the same geometry
+        # contract to native evaluation; keep multi-contact collision enabled.
+        self.model.geom_margin[:]=0
+        self.model.pair_margin[:]=0
         self.model.opt.timestep=cfg.sim_dt
         self.model.opt.iterations=10;self.model.opt.ls_iterations=10
         self.model.opt.jacobian=mujoco.mjtJacobian.mjJAC_DENSE
