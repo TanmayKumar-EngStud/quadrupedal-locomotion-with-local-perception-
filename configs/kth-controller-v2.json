@@ -1,0 +1,13 @@
+{
+  "env": {
+    "num_envs": 4096, "backend": "warp", "device": "cuda:0", "seed": 0,
+    "terrain_types": ["rough", "slope", "stairs_up", "stairs_down", "obstacles", "stepping_stones", "gaps", "piles"],
+    "terrain_weights": [1, 1, 1, 1, 1, 1.2, 1, 4.8],
+    "terrain_resolution": 0.05, "fine_terrain_resolution": 0.025, "terrain_levels": 10, "max_start_level": 9
+  },
+  "updates": 4000, "rollout_steps": 24, "epochs": 5, "minibatches": 4,
+  "learning_rate": 0.001, "desired_kl": 0.01, "gamma": 0.99, "gae_lambda": 0.95,
+  "entropy": 0.005, "hidden": [512, 256, 128],
+  "checkpoint_every": 25, "evaluation_every": 25,
+  "output": "runs/kth-controller-v2"
+}

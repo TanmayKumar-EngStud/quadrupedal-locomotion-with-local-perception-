@@ -1,12 +1,19 @@
 # Implementation status — October 14, 2026
 
-The executable project pipeline is implemented. KTH H100 10 GB MIG preflight, a 256-world PPO smoke run, checkpoint saving and GPU-checkpoint CPU execution have passed. The flat-ground training job has started; completed training and research validation are pending. No validated walking policy is included. See the KTH section of RUNBOOK.md for run locations and sample budgets.
+The goal-reaching controller was redesigned (v3) after the v1/v2 run learned to stand still instead of reaching targets. [GOAL_REACHING_V3.md](GOAL_REACHING_V3.md) records the diagnosis, the design and the GPU fixes:
+- one heightfield per terrain tile;
+- 20 solver iterations;
+- normalizer statistics frozen during each PPO update;
+- no zero-clipping of the reward.
+
+Training runs on the KTH H100 1g.10gb MIG slice at about 35,000-40,000 transitions/s with 4,096 robots. Results are reported from the run's metrics.jsonl and evaluation.jsonl; nothing is claimed beyond those files.
 
 ## Delivered
 
 - Native MuJoCo / batched MuJoCo Warp adapters, goal-reaching environment, 50 Hz position-target control and 12-joint PD configuration.
-- Frozen actor/critic observation contract; 1.6 x 1.2 m terrain scan at 5 cm; 2.5 cm precomputed elevation raster.
-- PPO clipped actor loss, value regression, GAE, time-limit bootstrapping, entropy, gradient clipping, KL stopping, running normalization and reflection consistency loss.
+- Multi-terrain training grid with 7 types x 10 levels (one heightfield per tile), a per-robot curriculum and chained random targets.
+- Observation contract v3 (161 actor values): proprioception, velocity command and target, plus Lab-1-style terrain samples (70 body points and 9 per foot).
+- PPO (rsl_rl recipe): clipped surrogate and value loss, GAE, time-limit bootstrapping, adaptive KL learning rate, per-rollout observation normalization, asymmetric critic.
 - Twenty-row terrain generation: flat, open, holes, moat, dead end, steps, rough heights, slalom walls, narrow bridge and tilted tops.
 - Configurable Lab-1-inspired reward groups with per-term logging and goal-reaching adaptations.
 - Atomic checkpoints, restart/warm-start, deterministic actor export and a downloadable bundle with manifest.

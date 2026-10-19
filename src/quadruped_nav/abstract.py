@@ -29,10 +29,11 @@ class Limits:
     speed_m_s: float = 0.6
     subgoal_budget_s: float = 4.0
     episode_budget_s: float = 60.0
+    body_half_width_m: float = 0.15   # the feet walk about this far either side of the path
 
     def __post_init__(self):
         for name, value in asdict(self).items():
-            if not math.isfinite(value) or value < 0 or (value == 0 and name not in {"max_gap_m", "max_height_step_m"}):
+            if not math.isfinite(value) or value < 0 or (value == 0 and name not in {"max_gap_m", "max_height_step_m", "body_half_width_m"}):
                 raise ValueError(f"Invalid {name}: {value}")
 
 
@@ -91,11 +92,39 @@ class Observation:
     action_mask: tuple[bool, ...]
 
 
-def straight_approach(start: Pile, target: Pile, supports: Sequence[Pile], limits: Limits) -> bool:
-    """Check support intervals along the straight centreline, including every gap.
+def _support_intervals(origin, delta, length, supports, low, high):
+    """(entry, exit, pile) distances along the segment origin -> origin + delta, one per support it crosses."""
+    enter, leave = np.zeros(len(supports)), np.ones(len(supports))
+    for axis in range(2):
+        if abs(delta[axis]) < 1e-12:
+            outside = (origin[axis] < low[:, axis]) | (origin[axis] > high[:, axis])
+            leave[outside] = -1
+        else:
+            a = (low[:, axis] - origin[axis]) / delta[axis]
+            b = (high[:, axis] - origin[axis]) / delta[axis]
+            enter = np.maximum(enter, np.minimum(a, b))
+            leave = np.minimum(leave, np.maximum(a, b))
+    return sorted(((float(enter[i] * length), float(leave[i] * length), p)
+                   for i, p in enumerate(supports) if leave[i] - enter[i] > 1e-9),
+                  key=lambda item: (item[1], item[0], item[2].id))
 
-    This point-body model has no foot placement or body-clearance guarantee. It
-    cannot turn along a winding graph path while pretending to follow one target.
+
+def _longest_unsupported(intervals, length):
+    """Longest stretch of [0, length] that no interval covers."""
+    reach = longest = 0.
+    for lo, hi, _ in sorted(intervals, key=lambda item: item[0]):
+        longest, reach = max(longest, lo - reach), max(reach, hi)
+    return max(longest, length - reach)
+
+
+def straight_approach(start: Pile, target: Pile, supports: Sequence[Pile], limits: Limits) -> bool:
+    """Check support intervals along the straight centreline, including every gap,
+    and under both lines of feet (body_half_width_m either side of it).
+
+    The side lines matter: a diagonal hop that clips a platform corner keeps its
+    centreline supported while one pair of legs walks over the pit. This is still a
+    point-body model with no foot placement or body-clearance guarantee. It cannot
+    turn along a winding graph path while pretending to follow one target.
     """
     length = math.hypot(target.x - start.x, target.y - start.y)
     if length < 1e-9:
@@ -107,19 +136,7 @@ def straight_approach(start: Pile, target: Pile, supports: Sequence[Pile], limit
     delta = np.array([target.x - start.x, target.y - start.y])
     origin = np.array([start.x, start.y])
     low, high = centres - halves, centres + halves
-    enter, leave = np.zeros(len(supports)), np.ones(len(supports))
-    for axis in range(2):
-        if abs(delta[axis]) < 1e-12:
-            outside = (origin[axis] < low[:, axis]) | (origin[axis] > high[:, axis])
-            leave[outside] = -1
-        else:
-            a = (low[:, axis] - origin[axis]) / delta[axis]
-            b = (high[:, axis] - origin[axis]) / delta[axis]
-            enter = np.maximum(enter, np.minimum(a, b))
-            leave = np.minimum(leave, np.maximum(a, b))
-    intervals = sorted(((float(enter[i] * length), float(leave[i] * length), p)
-                        for i, p in enumerate(supports) if leave[i] - enter[i] > 1e-9),
-                       key=lambda item: (item[1], item[0], item[2].id))
+    intervals = _support_intervals(origin, delta, length, supports, low, high)
     reachable = [(hi, p) for _, hi, p in intervals if p.id == start.id]
     for lo, hi, pile in intervals:
         if pile.id == start.id or any(
@@ -130,8 +147,16 @@ def straight_approach(start: Pile, target: Pile, supports: Sequence[Pile], limit
         ):
             reachable.append((hi, pile))
             if pile.id == target.id:
-                return True
-    return False
+                break
+    else:
+        return False
+    if limits.body_half_width_m:
+        side = np.array([-delta[1], delta[0]]) / length * limits.body_half_width_m
+        for offset in (side, -side):
+            feet = _support_intervals(origin + offset, delta, length, supports, low, high)
+            if _longest_unsupported(feet, length) > limits.max_gap_m + 1e-8:
+                return False
+    return True
 
 
 class Geometry:
