@@ -12,25 +12,35 @@ Follow [AGENTS.md](AGENTS.md) for the contributor-branch workflow. Agents push t
 
 ## Train in the cloud and run locally
 
-The current implementation includes a PPO goal-reaching controller pipeline, native MuJoCo and NVIDIA MuJoCo Warp backends, four planner types, twenty-row terrain generation, checkpoint export, physics execution and paired benchmarks. **No trained walking policy is included. GPU preflight and long training remain to be run on the H100/A100.**
+The goal-reaching controller (v3, October 14, 2026) is trained with PPO on the
+KTH GPU. 4,096 Go1 robots walk to random targets on 70 terrain tiles: rough,
+slopes, stairs up, stairs down, obstacles, stepping stones and gaps, each at
+10 difficulty levels, with a per-robot curriculum. The controller then runs
+in native MuJoCo on a laptop, where the planners choose its subgoals.
+[GOAL_REACHING_V3.md](docs/GOAL_REACHING_V3.md) explains the design and why
+the earlier controller only learned to stand still.
 
-- [Manual (PDF)](output/pdf/Manual.pdf): architecture, theory, rewards, important functions and operating instructions.
-- [Runbook](docs/RUNBOOK.md): exact setup, training, download and local execution commands.
-- [Implementation status](docs/IMPLEMENTATION_STATUS.md): tested scope, proposal differences and research limitations.
+- [Runbook](docs/RUNBOOK.md): setup, training, plots, export and local execution commands.
+- [Next training runs](docs/TRAINING_NEXT_RUNS.md): step-by-step guide for the v3/v4 runs of RQ1.
+- [Implementation status](docs/IMPLEMENTATION_STATUS.md): tested scope and research limitations.
 
 ```sh
 uv sync --extra train --frozen
 uv run --extra train pytest -q
-uv run --extra train quad-train --config configs/smoke.json
+uv run --extra train quad-train --config configs/smoke.json                 # CPU smoke run
+.venv/bin/python -m quadruped_nav.train --config configs/kth-goal-v3.json  # GPU run
+.venv/bin/python scripts/plot_training.py runs/kth-goal-v3-seed0           # figures
 ```
 
-On the Linux GPU instance, run `bash scripts/cloud_setup.sh` before a long job. The tiny smoke/preflight checkpoints only validate plumbing; they are not usable walking policies. Then train with `configs/cloud.json`, export a bundle, download it and run locally:
+Run the planner with a trained controller locally:
 
 ```sh
 uv run --extra train python play.py --checkpoint artifacts/controller/controller.pt --planner optimistic --family open --row 0
 ```
 
-New terrain families: flat, open, holes, moat, dead end, steps, rough heights, slalom walls, narrow bridge and slanted tops. Create a scene and inspect it with the existing viewer:
+Project scene families (planner experiments): flat, open, holes, moat, dead end,
+steps, rough heights, slalom walls, narrow bridge and slanted tops. Create a
+scene and inspect it with the existing viewer:
 
 ```sh
 uv run python -m quadruped_nav.terrain --family slalom --row 5 --seed 42
