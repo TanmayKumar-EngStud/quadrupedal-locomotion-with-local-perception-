@@ -27,3 +27,26 @@ The MuJoCo scene/viewer predates this workday. The initial abstract simulator no
 CPU verification: 56 tests passed locally and on the KTH Linux server. H100 10 GB MIG validation passed: standing CPU/GPU maximum qpos difference 3.42e-6; 256-world PPO smoke run completed 16,384 transitions and saved a checkpoint; that checkpoint loaded and ran in native CPU physics. The final batch smoke log had no solver-limit, capacity or traceback errors. Warp warns that capsule-cylinder collisions provide at most one contact.
 
 Cloud fixes use zero collision margins, an explicitly synchronized Warp-owned CUDA stream, and solver budgets of 100 iterations / 50 line-search iterations. Reproducible KTH configs are committed. The flat training run is active at `runs/kth-flat-seed0`, configured for 2,000 updates / 16,384,000 transitions; update 10 checkpoint creation was verified. Early throughput was about 6,000 samples/s and allocated GPU usage about 962 MiB. These are startup observations, not a final performance benchmark or evidence of successful walking. Export is queued after successful completion; terrain training has not started. See [runbook](docs/RUNBOOK.md) and [implementation status](docs/IMPLEMENTATION_STATUS.md).
+
+## October 15, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Train and validate the locomotion controller on the KTH GPU (continued from October 14): controller v1, update 3000 | Tanmay | [X] | Not recorded |
+| Measure the v1 hop-success table on the pile scenes | Tanmay | [X] | Not recorded |
+| Fine-tune controller v2 on pile terrain and a control run; compare v1, v2 and control | Tanmay | [X] | Not recorded |
+| Check both lines of feet in the planners' hop rule | Tanmay | [X] | Not recorded |
+| Freeze a validated controller, calibrate transitions and complete held-out physics experiments | Tanmay, Amedeo, Damien | [ ] | — |
+
+Controller v1 (3,000 PPO updates, 295M transitions) reaches 86% of the fixed-test targets on the KTH GPU and 82% in CPU MuJoCo. On the pile scenes 26% of its hops arrive. Controller v2 (v1 + 1,000 updates with a pile terrain type) reaches 63% of hops and 88% / 38% on the fixed test (seven original types / piles); the control run (same 1,000 updates, no piles) reaches 32%. With the corrected hop rule, v2 reaches 86% of hops on pile rows 0-9 (80% under the old rule). Bundles are on the KTH server and in `artifacts/` locally (not in Git). See [GOAL_REACHING_V3.md](docs/GOAL_REACHING_V3.md) and [the comparison](outputs/comparison/summary.md). 64 tests pass.
+
+## October 19, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Write the step-by-step guide for the v3/v4 training runs (RQ1) | Tanmay | [X] | Not recorded |
+| Re-spaced terrain levels and Gaussian terrain noise (RQ1) | Amedeo | [ ] | — |
+| Edge and stumble penalties, lower entropy bonus (RQ1) | Damien | [ ] | — |
+| Train v3 and v4 for 8 hours each | Tanmay, Amedeo, Damien | [ ] | — |
+
+The guide is [TRAINING_NEXT_RUNS.md](docs/TRAINING_NEXT_RUNS.md).
