@@ -1,233 +1,376 @@
-"""Goal-reaching Go1 task shared by native MuJoCo and batched MuJoCo Warp."""
+"""Goal-reaching Go1 environment shared by native MuJoCo and batched MuJoCo Warp.
+
+Two kinds of world:
+  * training (scene=None): a heightfield grid of terrain tiles. Every robot is
+    placed on a tile, gets random targets 1-3 m away, and a per-robot
+    curriculum moves it to harder or easier tiles;
+  * evaluation (scene=project scene JSON): the planner's stepping-stone
+    layouts, built from boxes (ground='boxes') or as one heightfield rasterized
+    by HeightGrid.from_scene (ground='heightfield', the training terrain's
+    representation). Targets are set by the planner (set_target).
+
+The policy is told where the target is (body frame) and the velocity a simple
+guidance law would command to get there: walk toward the target, turning to
+face it, and slow down near it. Rewards follow that command, pay for progress
+toward the target, and pay a bonus on arrival.
+"""
 from __future__ import annotations
 import math
 from pathlib import Path
 import tempfile
-import numpy as np
+from types import SimpleNamespace
 import mujoco
+import numpy as np
 import torch
-import torch.nn.functional as F
-from .config import EnvConfig, OBSERVATION_SPEC
 from .backend import NativeBackend, WarpBackend
+from .config import EnvConfig, OBSERVATION_SPEC, BODY_SCAN, FOOT_SCAN
+from .robot import FEET, CALVES, build_training_model, configure_physics
+from .terrain_grid import HeightGrid, TerrainGrid
+from . import rewards as reward_terms
 from ..mjcf import build_mjcf
-from ..terrain import generate_terrain, surface_normal
+
+FOOT_RADIUS = .023
+STANDING_HEIGHT = .30         # nominal base height above terrain, used to scale the body scan
+FALL_CLEARANCE = .12          # base closer than this to the highest terrain within 10 cm = collapsed
+FALL_TILT = -.5               # projected gravity z above this (tilt > 60 degrees) = fallen
+# Physically impossible speeds (m/s, rad/s, rad/s): the simulation of that robot
+# failed, so its episode is ended and the values are clamped before use.
+MAX_LINEAR_SPEED, MAX_BODY_RATE, MAX_JOINT_SPEED = 20., 60., 100.
 
 
 def yaw_of(q):
-    w,x,y,z=q.unbind(-1)
-    return torch.atan2(2*(w*z+x*y),1-2*(y*y+z*z))
+    w, x, y, z = q.unbind(-1)
+    return torch.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
 
 
-def inverse_rotate(q,v):
-    # MuJoCo quaternions use w,x,y,z.
-    u=-q[:,1:]; t=2*torch.cross(u,v,dim=-1)
-    return v+q[:,:1]*t+torch.cross(u,t,dim=-1)
+def inverse_rotate(q, v):
+    """Rotate world vectors v into the body frame of quaternions q (w, x, y, z)."""
+    u = -q[:, 1:]; t = 2 * torch.cross(u, v, dim=-1)
+    return v + q[:, :1] * t + torch.cross(u, t, dim=-1)
 
 
-class HeightMap:
-    """Perfect precomputed elevation sensing (Lab 1 style), 2.5 cm raster."""
-    def __init__(self,scene,device):
-        self.resolution=.025
-        records=scene['stones']+scene['platforms']
-        self.xmin=min(p['x']-p['size'] for p in records)-1
-        self.ymin=min(p['y']-p['size'] for p in records)-1
-        xmax=max(p['x']+p['size'] for p in records)+1
-        ymax=max(p['y']+p['size'] for p in records)+1
-        nx,ny=math.ceil((xmax-self.xmin)/self.resolution)+1,math.ceil((ymax-self.ymin)/self.resolution)+1
-        self.floor=-scene['parameters']['pit_depth']
-        heights=np.full((ny,nx),self.floor,dtype=np.float32)
-        for p in records+scene.get('obstacles',[]):
-            sx,sy=p.get('size',p.get('size_x')),p.get('size',p.get('size_y'))
-            r,ph=p.get('roll',0),p.get('pitch',0)
-            # R=Ry(pitch)Rx(roll); no yaw in this terrain contract.
-            R=np.array([[math.cos(ph),math.sin(ph)*math.sin(r),math.sin(ph)*math.cos(r)],
-                        [0,math.cos(r),-math.sin(r)],[-math.sin(ph),math.cos(ph)*math.sin(r),math.cos(ph)*math.cos(r)]])
-            radius=max(sx,sy)
-            ix0=max(0,int((p['x']-radius-self.xmin)/self.resolution));ix1=min(nx,int((p['x']+radius-self.xmin)/self.resolution)+2)
-            iy0=max(0,int((p['y']-radius-self.ymin)/self.resolution));iy1=min(ny,int((p['y']+radius-self.ymin)/self.resolution)+2)
-            x,y=np.meshgrid(self.xmin+np.arange(ix0,ix1)*self.resolution,self.ymin+np.arange(iy0,iy1)*self.resolution)
-            dx,dy=x-p['x'],y-p['y'];normal=R[:,2]
-            dz=-(normal[0]*dx+normal[1]*dy)/normal[2]
-            localx=R[0,0]*dx+R[1,0]*dy+R[2,0]*dz
-            localy=R[0,1]*dx+R[1,1]*dy+R[2,1]*dz
-            valid=(abs(localx)<=sx/2)&(abs(localy)<=sy/2)
-            patch=heights[iy0:iy1,ix0:ix1]
-            np.maximum(patch,np.where(valid,p['z_top']+dz,self.floor),out=patch)
-        self.values=torch.tensor(heights,device=device)
+def yaw_frame_points(xy, yaw, offsets):
+    """World xy of offsets (k, 2) given in the yaw-aligned frame at positions xy[..., 2]."""
+    c, s = torch.cos(yaw)[..., None], torch.sin(yaw)[..., None]
+    x = xy[..., None, 0] + c * offsets[:, 0] - s * offsets[:, 1]
+    y = xy[..., None, 1] + s * offsets[:, 0] + c * offsets[:, 1]
+    return torch.stack([x, y], -1)
 
-    def sample(self,xy):
-        ix=torch.round((xy[...,0]-self.xmin)/self.resolution).long()
-        iy=torch.round((xy[...,1]-self.ymin)/self.resolution).long()
-        valid=(ix>=0)&(ix<self.values.shape[1])&(iy>=0)&(iy<self.values.shape[0])
-        result=self.values[iy.clamp(0,self.values.shape[0]-1),ix.clamp(0,self.values.shape[1]-1)]
-        return torch.where(valid,result,torch.full_like(result,self.floor))
+
+def robots_per_type(n, weights):
+    """Split n robots among terrain types in proportion to weights (largest remainder)."""
+    share = n * np.asarray(weights, dtype=float) / sum(weights)
+    counts = np.floor(share).astype(int)
+    counts[np.argsort(counts - share, kind='stable')[:n - counts.sum()]] += 1
+    return counts
 
 
 class GoalEnv:
-    def __init__(self,cfg:EnvConfig,scene=None):
-        cfg.validate();self.cfg=cfg;self.device=cfg.device;self.n=cfg.num_envs
-        self.generator=torch.Generator(device=self.device).manual_seed(cfg.seed)
-        self.scene=scene if scene is not None else generate_terrain(cfg.family,cfg.row,cfg.seed)
-        with tempfile.TemporaryDirectory() as temp:
-            self.model=mujoco.MjModel.from_xml_path(str(build_mjcf(self.scene,Path(temp)/'scene.xml')))
-        # Warp MULTICCD requires zero collision margins. Apply the same geometry
-        # contract to native evaluation; keep multi-contact collision enabled.
-        self.model.geom_margin[:]=0
-        self.model.pair_margin[:]=0
-        self.model.opt.timestep=cfg.sim_dt
-        self.model.opt.iterations=100;self.model.opt.ls_iterations=50
-        self.model.opt.jacobian=mujoco.mjtJacobian.mjJAC_DENSE
-        self.model.actuator_gainprm[:,0]=cfg.kp
-        self.model.actuator_biasprm[:,1]=-cfg.kp;self.model.actuator_biasprm[:,2]=-cfg.kd
-        self.model.dof_damping[6:]=.2
-        self.backend=(NativeBackend if cfg.backend=='native' else WarpBackend)(self.model,self.n,self.device,nconmax=cfg.nconmax,njmax=cfg.njmax)
-        self.home=torch.tensor(self.model.key_qpos[0],dtype=torch.float32,device=self.device)
-        self.joint_low=torch.tensor(self.model.actuator_ctrlrange[:,0],dtype=torch.float32,device=self.device)
-        self.joint_high=torch.tensor(self.model.actuator_ctrlrange[:,1],dtype=torch.float32,device=self.device)
-        self.heightmap=HeightMap(self.scene,self.device)
-        self.supports=self.scene['stones']+self.scene['platforms']
-        self.piles=torch.tensor([[p['x'],p['y'],p['z_top']] for p in self.supports],device=self.device,dtype=torch.float32)
-        self.foot_ids=[self.model.site(n).id for n in ['FR','FL','RR','RL']]
-        self.trunk_id=self.model.body('trunk').id
-        x,y=torch.meshgrid(torch.linspace(-.8,.8,33,device=self.device),torch.linspace(-.6,.6,25,device=self.device),indexing='ij')
-        self.scan=torch.stack([x.flatten(),y.flatten()],-1)
-        self.target=torch.zeros((self.n,3),device=self.device)
-        self.target_heading=torch.zeros(self.n,device=self.device)
-        self.final=torch.zeros(self.n,device=self.device,dtype=torch.bool)
-        self.arrival_awarded=torch.zeros(self.n,device=self.device,dtype=torch.bool)
-        self.previous_action=torch.zeros((self.n,12),device=self.device)
-        self.previous_feet=torch.zeros((self.n,4,3),device=self.device)
-        self.air_time=torch.zeros((self.n,4),device=self.device)
-        self.elapsed=torch.zeros(self.n,device=self.device)
-        self.target_elapsed=torch.zeros(self.n,device=self.device)
-        self.update_index=0
-        self.reset(torch.arange(self.n,device=self.device))
+    def __init__(self, cfg: EnvConfig, scene=None, grid=None, ground='boxes'):
+        cfg.validate()
+        if ground not in ('boxes', 'heightfield'): raise ValueError('ground must be boxes or heightfield')
+        self.cfg, self.n, self.device = cfg, cfg.num_envs, cfg.device
+        self.generator = torch.Generator(device=self.device).manual_seed(cfg.seed)
+        self.scene = scene
+        if scene is None:
+            self.grid = grid or TerrainGrid(cfg.terrain_types, cfg.terrain_levels, cfg.tile_size,
+                                            cfg.terrain_resolution, seed=cfg.seed,
+                                            fine_resolution=cfg.fine_terrain_resolution)
+            self.model = build_training_model(self.grid)
+            self.terrain = self.grid.height_grid(self.device)
+        else:
+            self.grid = None
+            self.terrain = HeightGrid.from_scene(scene, self.device, resolution=cfg.fine_terrain_resolution)
+            # The heightfield is the height map the policy senses, so physics and sensing agree exactly.
+            field = None if ground == 'boxes' else (self.terrain.values.cpu().numpy(), self.terrain.x_min,
+                                                    self.terrain.y_min, self.terrain.resolution)
+            with tempfile.TemporaryDirectory() as temp:
+                self.model = mujoco.MjModel.from_xml_path(str(build_mjcf(scene, Path(temp) / 'scene.xml', heightfield=field)))
+            self.supports = scene['stones'] + scene['platforms']
+            self.piles = torch.tensor([[p['x'], p['y'], p['z_top']] for p in self.supports], device=self.device)
+        configure_physics(self.model, cfg)
+        backend = NativeBackend if cfg.backend == 'native' else WarpBackend
+        self.backend = backend(self.model, self.n, self.device, nconmax=cfg.nconmax, njmax=cfg.njmax)
+        self.substeps = round(cfg.control_dt / cfg.sim_dt)
 
-    def rand(self,shape): return torch.rand(shape,device=self.device,generator=self.generator)
+        # Robot constants.
+        self.home = torch.tensor(self.model.key_qpos[0], dtype=torch.float32, device=self.device)
+        self.home_joints = self.home[7:]
+        self.joint_low = torch.tensor(self.model.actuator_ctrlrange[:, 0], dtype=torch.float32, device=self.device)
+        self.joint_high = torch.tensor(self.model.actuator_ctrlrange[:, 1], dtype=torch.float32, device=self.device)
+        middle, half = (self.joint_low + self.joint_high) / 2, (self.joint_high - self.joint_low) / 2
+        self.soft_low, self.soft_high = middle - .95 * half, middle + .95 * half
+        self.foot_sites = [self.model.site(name).id for name in FEET]
+        self.knee_bodies = [self.model.body(name).id for name in CALVES]
+        self.body_scan = torch.tensor(BODY_SCAN, dtype=torch.float32, device=self.device)
+        self.foot_scan = torch.tensor(FOOT_SCAN, dtype=torch.float32, device=self.device)
+        self.clearance_scan = torch.tensor([[0, 0], [.1, 0], [-.1, 0], [0, .08], [0, -.08]], dtype=torch.float32, device=self.device)
+        self.speed_limits = torch.tensor([MAX_LINEAR_SPEED] * 3 + [MAX_BODY_RATE] * 3 + [MAX_JOINT_SPEED] * 12, device=self.device)
 
-    def reset(self,ids):
+        # Per-robot task state.
+        zeros = lambda *shape, dtype=torch.float32: torch.zeros((self.n, *shape), device=self.device, dtype=dtype)
+        self.target = zeros(3)
+        self.start_distance = zeros()
+        self.max_speed = torch.full((self.n,), sum(cfg.max_speed) / 2, device=self.device)
+        self.target_budget = zeros()
+        self.target_elapsed = zeros()
+        self.elapsed = zeros()
+        self.reached = zeros(dtype=torch.bool)
+        self.final = zeros(dtype=torch.bool)
+        self.hold_left = zeros()
+        self.path_length = zeros()
+        self.previous_action = zeros(12)
+        self.previous_feet = zeros(4, 3)
+        self.previous_joint_vel = zeros(12)
+        self.air_time = zeros(4)
+        self.last_contact = zeros(4, dtype=torch.bool)
+        self.episode_arrivals = zeros()
+        self.episode_misses = zeros()
+        # Curriculum: terrain column fixed per robot, difficulty level adapts.
+        if self.grid is not None:
+            self.centres = self.grid.tile_centres(self.device)
+            if cfg.terrain_weights is None:
+                self.column = torch.arange(self.n, device=self.device) % len(self.grid.types)
+            else:
+                counts = torch.as_tensor(robots_per_type(self.n, cfg.terrain_weights), device=self.device)
+                self.column = torch.repeat_interleave(torch.arange(len(self.grid.types), device=self.device), counts)
+            self.level = torch.randint(0, cfg.max_start_level + 1, (self.n,), device=self.device, generator=self.generator)
+            self.hole_threshold = torch.tensor(self.grid.hole_threshold, device=self.device)   # [level, type]
+            self.tile_x = torch.tensor(self.grid.origin_x, dtype=torch.float32, device=self.device)
+            self.tile_y = torch.tensor(self.grid.origin_y, dtype=torch.float32, device=self.device)
+        self.reset(torch.arange(self.n, device=self.device))
+
+    # ------------------------------------------------------------------ utils
+    def rand(self, *shape): return torch.rand(shape, device=self.device, generator=self.generator)
+
+    def uniform(self, bounds, *shape): return bounds[0] + (bounds[1] - bounds[0]) * self.rand(*shape)
+
+    def _kinematics(self):
+        """Robot state in the frames the observations and rewards need."""
+        q, v = self.backend.tensor('qpos'), self.backend.tensor('qvel')
+        finite = torch.isfinite(q).all(-1) & torch.isfinite(v).all(-1)
+        q, v = torch.nan_to_num(q), torch.nan_to_num(v)
+        valid = finite & (v.abs() <= self.speed_limits).all(-1)
+        v = torch.maximum(torch.minimum(v, self.speed_limits), -self.speed_limits)
+        quat = q[:, 3:7]
+        down = torch.tensor([0., 0., -1.], device=self.device).expand(self.n, 3)
+        feet = torch.nan_to_num(self.backend.tensor('site_xpos')[:, self.foot_sites]).clone()
+        knees = torch.nan_to_num(self.backend.tensor('xpos')[:, self.knee_bodies])
+        return SimpleNamespace(
+            valid=valid, pos=q[:, :3].clone(), quat=quat.clone(), yaw=yaw_of(quat),
+            lin_vel_world=v[:, :3].clone(), lin_vel_body=inverse_rotate(quat, v[:, :3]), ang_vel_body=v[:, 3:6].clone(),
+            gravity_body=inverse_rotate(quat, down), joint_pos=q[:, 7:].clone(), joint_vel=v[:, 6:].clone(),
+            feet=feet, foot_height=feet[:, :, 2] - self.terrain.sample(feet[:, :, :2]) - FOOT_RADIUS,
+            knee_height=knees[:, :, 2] - self.terrain.sample(knees[:, :, :2]))
+
+    def _target_geometry(self, k):
+        """Distance, world direction and body-frame offset of each robot's target."""
+        delta = self.target[:, :2] - k.pos[:, :2]
+        distance = torch.linalg.vector_norm(delta, dim=-1)
+        direction = delta / distance.clamp_min(1e-3)[:, None]
+        c, s = torch.cos(k.yaw), torch.sin(k.yaw)
+        local = torch.stack([c * delta[:, 0] + s * delta[:, 1], -s * delta[:, 0] + c * delta[:, 1]], -1)
+        return distance, direction, local
+
+    def _command(self, distance, local):
+        """Guidance law: velocity (vx, vy, wz) in the yaw frame that leads to the target.
+
+        The linear part points at the target with the same magnitude whatever the
+        robot's heading. Scaling it down when the target is behind let robots face
+        away from their targets and earn the tracking reward by standing still.
+        The yaw rate turns the robot to face the target.
+        """
+        cfg = self.cfg
+        heading_error = torch.atan2(local[:, 1], local[:, 0])
+        speed = self.max_speed * (distance / cfg.slow_down_radius).clamp(0, 1)
+        v = speed[:, None] * local / distance.clamp_min(1e-3)[:, None]
+        wz = (cfg.yaw_gain * heading_error).clamp(-1.5, 1.5) * (distance > cfg.slow_down_radius)
+        return torch.cat([v, wz[:, None]], -1) * (~self.reached)[:, None]
+
+    # ------------------------------------------------------------ observations
+    def observations(self, noise=True):
+        return self._observe(self._kinematics(), noise)
+
+    def _observe(self, k, noise=True):
+        """Actor observation (optionally noisy) and critic observation (clean + privileged)."""
+        clean = self._actor_observation(k, 0.)
+        actor = self._actor_observation(k, self.cfg.noise) if noise and self.cfg.noise else clean
+        privileged = torch.cat([
+            (k.pos[:, 2] - self.terrain.sample(k.pos[:, :2]))[:, None], k.foot_height,
+            (self.target_budget - self.target_elapsed)[:, None]], -1)
+        return actor, torch.cat([clean, privileged], -1).clamp(-100, 100)
+
+    def _actor_observation(self, k, noise_scale):
+        jitter = lambda x, amount: x + (2 * self.rand(*x.shape) - 1) * amount * noise_scale if noise_scale else x
+        distance, _, local = self._target_geometry(k)
+        body_points = yaw_frame_points(k.pos[:, :2], k.yaw, self.body_scan)                  # (n, 70, 2)
+        foot_points = yaw_frame_points(k.feet[:, :, :2], k.yaw[:, None], self.foot_scan)     # (n, 4, 9, 2)
+        body_scan = (k.pos[:, 2:3] - STANDING_HEIGHT - jitter(self.terrain.sample(body_points), .02)).clamp(-1, 1)
+        foot_scan = (k.feet[:, :, 2:3] - jitter(self.terrain.sample(foot_points), .02)).clamp(-1, 1).flatten(1)
+        actor = torch.cat([
+            jitter(k.lin_vel_body, .1) * 2., jitter(k.ang_vel_body, .2) * .25, jitter(k.gravity_body, .05),
+            self._command(distance, local), local * (3. / distance.clamp_min(3.))[:, None], distance.clamp(max=3.)[:, None],
+            jitter(k.joint_pos - self.home_joints, .01), jitter(k.joint_vel, 1.5) * .05, self.previous_action,
+            (k.foot_height < .02).float(), body_scan, foot_scan], -1)
+        assert actor.shape[-1] == OBSERVATION_SPEC['actor_dim']
+        return actor.clamp(-100, 100)
+
+    # ------------------------------------------------------------ resets/targets
+    def reset(self, ids):
         if not len(ids): return
-        q=self.home.repeat(len(ids),1)
-        # Starting platform is large enough for the full robot, unlike small piles.
-        q[:,:2]+=(self.rand((len(ids),2))-.5)*.10
-        angle=(self.rand((len(ids),))-.5)*.8
-        q[:,3]=torch.cos(angle/2);q[:,4:6]=0;q[:,6]=torch.sin(angle/2)
-        self.backend.reset(ids,q)
-        self.elapsed[ids]=0;self.target_elapsed[ids]=0;self.previous_action[ids]=0;self.air_time[ids]=0
-        self.previous_feet[ids]=self.backend.tensor('site_xpos')[ids][:,self.foot_ids]
-        self.sample_targets(ids)
+        cfg, count = self.cfg, len(ids)
+        q = self.home.repeat(count, 1)
+        if self.grid is not None:
+            spawn = self.centres[self.level[ids], self.column[ids]]
+            q[:, :2] = spawn[:, :2] + (self.rand(count, 2) - .5) * 1.
+            q[:, 2] = self.terrain.sample(q[:, :2]) + STANDING_HEIGHT + .02
+            yaw = (2 * self.rand(count) - 1) * math.pi
+        else:
+            q[:, :2] += (self.rand(count, 2) - .5) * .10
+            yaw = (self.rand(count) - .5) * .8
+        q[:, 3], q[:, 4:6], q[:, 6] = torch.cos(yaw / 2), 0, torch.sin(yaw / 2)
+        self.backend.reset(ids, q)
+        for buffer in (self.elapsed, self.previous_action, self.previous_joint_vel, self.air_time,
+                       self.episode_arrivals, self.episode_misses):
+            buffer[ids] = 0
+        self.last_contact[ids] = True
+        self.previous_feet[ids] = self.backend.tensor('site_xpos')[ids][:, self.foot_sites]
+        self.final[ids] = False
+        self._new_targets(ids)
 
-    def sample_targets(self,ids):
+    def _new_targets(self, ids):
+        """Random reachable targets: 1-3 m away, on the robot's tile, not in a hole."""
         if not len(ids): return
-        pos=self.backend.tensor('qpos')[ids,:3]
-        delta=self.piles[None,:,:2]-pos[:,None,:2]
-        dist=torch.linalg.vector_norm(delta,dim=-1)
-        eligible=(dist>=1.)&(dist<=2.)&(abs(self.piles[None,:,2]-pos[:,None,2]+.3)<.15)
-        # Fallback to nearer observed support where a nominal target is absent.
-        fallback=(dist>.25)&(dist<=2.)
-        eligible=torch.where(eligible.any(-1,keepdim=True),eligible,fallback)
-        scores=self.rand(eligible.shape).masked_fill(~eligible,-1)
-        selected=scores.argmax(-1)
-        self.target[ids]=self.piles[selected]
-        none=~eligible.any(-1)
-        self.target[ids[none]]=pos[none]
-        self.target_heading[ids]=torch.atan2(self.target[ids,1]-pos[:,1],self.target[ids,0]-pos[:,0])
-        self.final[ids]=self.rand((len(ids),))<self.cfg.final_probability
-        self.final[ids[none]]=True
-        self.target_elapsed[ids]=0;self.arrival_awarded[ids]=False
+        cfg, count = self.cfg, len(ids)
+        pos = self.backend.tensor('qpos')[ids, :2]
+        if self.grid is None:
+            # Project scene: a random pile 1-2 m away, else stay in place.
+            distance = torch.linalg.vector_norm(self.piles[None, :, :2] - pos[:, None], dim=-1)
+            eligible = (distance >= 1.) & (distance <= 2.)
+            choice = self.rand(*eligible.shape).masked_fill(~eligible, -1).argmax(-1)
+            xy = torch.where(eligible.any(-1, keepdim=True), self.piles[choice, :2], pos)
+        else:
+            candidates = 8
+            angle = (2 * self.rand(count, candidates) - 1) * math.pi
+            radius = self.uniform(cfg.target_distance, count, candidates)
+            xy = pos[:, None] + radius[..., None] * torch.stack([angle.cos(), angle.sin()], -1)
+            low = torch.stack([self.tile_x[self.level[ids]], self.tile_y[self.column[ids]]], -1)   # tile corner
+            xy = torch.maximum(torch.minimum(xy, (low + cfg.tile_size - .5)[:, None]), (low + .5)[:, None])
+            far_enough = torch.linalg.vector_norm(xy - pos[:, None], dim=-1) >= .75 * cfg.target_distance[0]
+            in_hole = self.terrain.sample(xy) < self.hole_threshold[self.level[ids], self.column[ids]][:, None]
+            valid = far_enough & ~in_hole
+            first = torch.where(valid.any(-1), valid.float().argmax(-1), torch.full((count,), candidates - 1, device=self.device))
+            xy = xy[torch.arange(count, device=self.device), first]
+        self._assign(ids, xy, final=False)
+        self.max_speed[ids] = self.uniform(cfg.max_speed, count)
+        self.target_budget[ids] = 2. + 2. * self.start_distance[ids] / self.max_speed[ids]
 
-    def set_target(self,xy,heading,final=False,ids=None):
-        ids=torch.arange(self.n,device=self.device) if ids is None else ids
-        self.target[ids,:2]=torch.as_tensor(xy,device=self.device)
-        self.target[ids,2]=self.heightmap.sample(self.target[ids,:2])
-        self.target_heading[ids]=heading;self.final[ids]=final
-        self.target_elapsed[ids]=0;self.arrival_awarded[ids]=False
+    def _assign(self, ids, xy, final):
+        pos = self.backend.tensor('qpos')[ids, :2]
+        self.target[ids, :2] = xy
+        self.target[ids, 2] = self.terrain.sample(xy)
+        self.start_distance[ids] = torch.linalg.vector_norm(xy - pos, dim=-1)
+        self.final[ids] = final
+        self.reached[ids] = False
+        self.target_elapsed[ids] = 0
+        self.hold_left[ids] = 0
+        self.path_length[ids] = 0
 
-    def observations(self,noise=True):
-        q=self.backend.tensor('qpos');v=self.backend.tensor('qvel');quat=q[:,3:7]
-        yaw=yaw_of(quat);c,s=torch.cos(yaw),torch.sin(yaw)
-        delta=self.target[:,:2]-q[:,:2]
-        target_local=torch.stack([c*delta[:,0]+s*delta[:,1],-s*delta[:,0]+c*delta[:,1]],-1)
-        error=self.target_heading-yaw
-        points=torch.stack([c[:,None]*self.scan[None,:,0]-s[:,None]*self.scan[None,:,1],s[:,None]*self.scan[None,:,0]+c[:,None]*self.scan[None,:,1]],-1)+q[:,None,:2]
-        heights=(q[:,2,None]-self.heightmap.sample(points)-.30).clamp(-1,1)
-        gravity=inverse_rotate(quat,torch.tensor([0.,0.,-1.],device=self.device).expand(self.n,3))
-        # MuJoCo free-joint angular qvel is body-local; linear qvel is world.
-        actor=torch.cat([v[:,3:6],gravity,q[:,7:]-self.home[7:],v[:,6:]*.05,self.previous_action,
-                         target_local,torch.stack([torch.sin(error),torch.cos(error)],-1),
-                         (1-self.target_elapsed/self.cfg.subgoal_seconds).clamp(0,1)[:,None],self.final.float()[:,None],heights],-1)
-        if noise and self.cfg.noise:
-            actor=actor.clone();actor[:,:30]+=(self.rand((self.n,30))-.5)*2*self.cfg.noise
-        actor=actor.clamp(-10,10)
-        critic=torch.cat([actor,inverse_rotate(quat,v[:,:3])],-1)
-        assert actor.shape[-1]==OBSERVATION_SPEC['actor_dim']
-        return actor,critic
+    def set_target(self, xy, heading=None, final=False, ids=None, speed=None):
+        """Planner interface: give the robots in ids a new target (heading is ignored).
 
-    def step(self,action,auto_reset=True,chain=True):
-        cfg=self.cfg;dt=cfg.control_dt
-        action=action.clamp(-1,1)
-        before=self.backend.tensor('qpos').clone();old_v=self.backend.tensor('qvel').clone()
-        old_distance=torch.linalg.vector_norm(self.target[:,:2]-before[:,:2],dim=-1)
-        targets=(self.home[7:]+cfg.action_scale*action).clamp(self.joint_low,self.joint_high)
-        self.backend.step(targets,round(dt/cfg.sim_dt))
-        q=self.backend.tensor('qpos').clone();v=self.backend.tensor('qvel').clone()
-        self.elapsed+=dt;self.target_elapsed+=dt
-        finite=torch.isfinite(q).all(-1)&torch.isfinite(v).all(-1)
-        if not bool(finite.all()):raise FloatingPointError('Nonfinite physics state; stop rather than train on corrupted rollouts')
-        q=torch.nan_to_num(q);v=torch.nan_to_num(v)
-        distance=torch.linalg.vector_norm(self.target[:,:2]-q[:,:2],dim=-1)
-        yaw=yaw_of(q[:,3:7]);error=torch.atan2(torch.sin(self.target_heading-yaw),torch.cos(self.target_heading-yaw))
-        gravity=inverse_rotate(q[:,3:7],torch.tensor([0.,0.,-1.],device=self.device).expand(self.n,3))
-        feet=self.backend.tensor('site_xpos')[:,self.foot_ids].clone()
-        foot_h=feet[:,:,2]-self.heightmap.sample(feet[:,:,:2])
-        contact=foot_h<.045
-        foot_vel=(feet-self.previous_feet)/dt
-        self.air_time+=dt
-        # Relative to actual local terrain; over a hole the base may be above
-        # pit height, so also terminate below the support scene's nominal floor.
-        base_h=q[:,2]-self.heightmap.sample(q[:,:2])
-        fall=(gravity[:,2]>-.35)|(base_h<.14)|(q[:,2]<-.3)|(~finite)
-        arrived=(distance<cfg.arrival_radius)&(~fall)&(base_h>.18)&(base_h<.5)
-        newly_arrived=arrived&(~self.arrival_awarded)
-        self.arrival_awarded|=arrived
-        target_timeout=self.target_elapsed>=cfg.subgoal_seconds
-        timeout=self.elapsed>=cfg.episode_seconds
-        final_complete=self.final&self.arrival_awarded&target_timeout
-        terminated=fall|final_complete
-        truncated=timeout&(~terminated)
-        direction=(self.target[:,:2]-q[:,:2])/distance.clamp_min(.01)[:,None]
-        desired=direction*torch.minimum(distance,torch.full_like(distance,.6))[:,None]
-        final_hold=self.final&arrived
-        desired[final_hold]=0
-        torques=self.backend.tensor('qfrc_actuator')[:,6:]
-        softlo=self.home[7:]+.95*(self.joint_low-self.home[7:]);softhi=self.home[7:]+.95*(self.joint_high-self.home[7:])
-        values=dict(
-            position=1/(1+distance.square())*(self.target_elapsed>cfg.subgoal_seconds-1),
-            heading=1/(1+error.square())*(distance<.5),
-            progress=(old_distance-distance)/dt*(self.update_index<150),
-            tracking_lin_vel=torch.exp(-((v[:,:2]-desired).square().sum(-1))/.25),
-            tracking_ang_vel=torch.exp(-(v[:,5]-error.clamp(-1,1)).square()/.25),
-            orientation=gravity[:,:2].square().sum(-1),lin_vel_z=v[:,2].square(),ang_vel_xy=v[:,3:5].square().sum(-1),
-            pose=torch.exp(-(q[:,7:]-self.home[7:]).square().mean(-1)),
-            feet_clearance=(foot_h.clamp(0,.1)*(~contact)).mean(-1)*(distance>.25),
-            feet_slip=(foot_vel[:,:,:2].square().sum(-1)*contact).mean(-1),
-            feet_air_time=((self.air_time-.08).clamp(0,.4)*contact).mean(-1)*(distance>.25),
-            action_rate=(action-self.previous_action).square().sum(-1),torques=torques.square().sum(-1),
-            energy=abs(torques*v[:,6:]).sum(-1),dof_acc=((v[:,6:]-old_v[:,6:])/dt).square().sum(-1),
-            dof_pos_limits=((softlo-q[:,7:]).clamp_min(0)+(q[:,7:]-softhi).clamp_min(0)).sum(-1),
-            stall=((distance>.5)&(torch.linalg.vector_norm(v[:,:2],dim=-1)<.05)).float(),
-            stand_still=(v[:,:3].square().sum(-1)+.05*v[:,6:].square().sum(-1))*final_hold,
-            arrival=newly_arrived.float()/dt,fall=fall.float()/dt)
-        weighted={k:torch.nan_to_num(values[k])*weight*dt for k,weight in cfg.rewards.items()}
-        reward=sum(weighted.values())
-        self.previous_action=action.clone();self.previous_feet=feet;self.air_time[contact]=0
-        # Value bootstrap for time limits MUST see the terminal state, before reset.
-        terminal_actor,terminal_critic=self.observations(noise=False)
-        info=dict(terminated=terminated.clone(),truncated=truncated.clone(),terminal_critic=terminal_critic,
-                  arrived=newly_arrived.clone(),fall=fall.clone(),final_complete=final_complete.clone(),target_timeout=(target_timeout&~arrived).clone(),
-                  reward_terms=weighted,distance=distance.clone())
+        A final target is held forever once reached; otherwise the robot stops
+        at the target and waits for the next set_target call.
+        """
+        ids = torch.arange(self.n, device=self.device) if ids is None else torch.as_tensor(ids, device=self.device)
+        xy = torch.as_tensor(xy, device=self.device, dtype=torch.float32).reshape(-1, 2).expand(len(ids), 2)
+        self._assign(ids, xy, final)
+        self.max_speed[ids] = sum(self.cfg.max_speed) / 2 if speed is None else speed
+        self.target_budget[ids] = 2. + 2. * self.start_distance[ids] / self.max_speed[ids]
+
+    def _update_levels(self, ids, fell):
+        """Curriculum: promote after reaching >= 80% of targets without a fall, demote after a fall or no progress.
+
+        (Requiring a perfect episode kept stepping-stone robots on level 0 even at
+        91% target success.)
+        """
+        arrivals, misses = self.episode_arrivals[ids], self.episode_misses[ids]
+        promote = (arrivals >= 2) & (arrivals >= 4 * misses) & ~fell
+        demote = fell | ((arrivals == 0) & (misses >= 1))
+        level = self.level[ids] + promote.long() - demote.long()
+        level = level.clamp_min(0)
+        # Robots that solved the hardest row restart on a random row (legged_gym).
+        top = level >= self.cfg.terrain_levels
+        level[top] = torch.randint(0, self.cfg.terrain_levels, (int(top.sum()),), device=self.device, generator=self.generator)
+        self.level[ids] = level
+
+    # -------------------------------------------------------------------- step
+    def step(self, action, auto_reset=True, chain=True):
+        cfg, dt = self.cfg, self.cfg.control_dt
+        action = action.clamp(-cfg.action_clip, cfg.action_clip)
+        joint_targets = (self.home_joints + cfg.action_scale * action).clamp(self.joint_low, self.joint_high)
+        before = self.backend.tensor('qpos')[:, :2].clone()
+        self.backend.step(joint_targets, self.substeps)
+        k = self._kinematics()
+        self.elapsed += dt; self.target_elapsed += dt
+        self.path_length += torch.linalg.vector_norm(k.pos[:, :2] - before, dim=-1)
+        distance, direction, local = self._target_geometry(k)
+
+        # Feet: contact, swing timing (legged_gym touchdown bookkeeping), slip.
+        contact = k.foot_height < .02
+        touchdown = (self.air_time > 0) & (contact | self.last_contact)
+        self.air_time += dt
+        air_time_on_touchdown = self.air_time.clone()
+        self.air_time *= ~(contact | self.last_contact)
+        self.last_contact = contact
+        foot_velocity = (k.feet - self.previous_feet) / dt
+
+        # Outcomes.
+        nearby = self.terrain.sample(yaw_frame_points(k.pos[:, :2], k.yaw, self.clearance_scan)).amax(-1)
+        fall = ((k.gravity_body[:, 2] > FALL_TILT) | (k.pos[:, 2] - nearby < FALL_CLEARANCE)) & k.valid
+        arrived = (distance < cfg.arrival_radius) & ~fall & k.valid
+        newly_arrived = arrived & ~self.reached
+        time_to_goal = self.target_elapsed.clone()          # meaningful where newly_arrived
+        efficiency = (self.start_distance / self.path_length.clamp_min(1e-3)).clamp(max=1.)
+        self.reached |= arrived
+        hold = self.uniform(cfg.hold_seconds, self.n)
+        self.hold_left = torch.where(newly_arrived, torch.where(self.final, torch.full_like(hold, math.inf), hold), self.hold_left - dt)
+        missed = (self.target_elapsed >= self.target_budget) & ~self.reached & ~fall
+        terminated = fall | ~k.valid
+        truncated = (self.elapsed >= cfg.episode_seconds) & ~terminated
+        done = terminated | truncated
+        self.episode_arrivals += newly_arrived.float(); self.episode_misses += missed.float()
+
+        # Rewards (see rewards.py for the definitions and the reasoning).
+        moving = ~self.reached
+        s = SimpleNamespace(
+            lin_vel_body=k.lin_vel_body, lin_vel_world=k.lin_vel_world, ang_vel_body=k.ang_vel_body,
+            gravity_body=k.gravity_body, command=self._command(distance, local), target_direction=direction,
+            max_speed=self.max_speed, moving=moving, touchdown=touchdown, air_time_on_touchdown=air_time_on_touchdown,
+            foot_velocity=foot_velocity, contact=contact, knee_height=k.knee_height, joint_pos=k.joint_pos,
+            home_joints=self.home_joints, torques=torch.nan_to_num(self.backend.tensor('qfrc_actuator')[:, 6:]),
+            joint_acc=(k.joint_vel - self.previous_joint_vel) / dt, action=action, previous_action=self.previous_action,
+            soft_low=self.soft_low, soft_high=self.soft_high, newly_arrived=newly_arrived, fall=fall)
+        reward, terms = reward_terms.compute(s, cfg.rewards, dt, cfg.only_positive_rewards)
+        self.previous_action = action.clone(); self.previous_feet = k.feet; self.previous_joint_vel = k.joint_vel
+
+        # Observation of the state reached by this step (needed to bootstrap
+        # the value of episodes cut by the time limit), before any reset.
+        terminal_actor, terminal_critic = self._observe(k, noise=False)
+        info = dict(terminated=terminated, truncated=truncated, terminal_critic=terminal_critic,
+                    arrived=newly_arrived, within_goal=arrived, fall=fall, missed=missed, distance=distance,
+                    unstable=~k.valid, toward_velocity=(k.lin_vel_world[:, :2] * direction).sum(-1) * moving,
+                    moving=moving, time_to_goal=time_to_goal, path_efficiency=efficiency, reward_terms=terms,
+                    episode_seconds=self.elapsed.clone(), command_speed=torch.linalg.vector_norm(s.command[:, :2], dim=-1))
+        if self.grid is not None:
+            info.update(column=self.column, level=self.level.clone())
         if chain:
-            switch=(arrived&~self.final)|target_timeout
-            self.sample_targets(torch.where(switch&~terminated&~truncated)[0])
-        if auto_reset:self.reset(torch.where(terminated|truncated)[0])
-        return *self.observations(),reward,terminated|truncated,info
+            switch = ((self.reached & (self.hold_left <= 0)) | missed) & ~done
+            self._new_targets(torch.where(switch)[0])
+        if auto_reset:
+            ids = torch.where(done)[0]
+            if self.grid is not None and self.cfg.curriculum and len(ids):
+                self._update_levels(ids, fall[ids])
+            self.reset(ids)
+        actor, critic = self.observations()
+        return actor, critic, reward, done, info

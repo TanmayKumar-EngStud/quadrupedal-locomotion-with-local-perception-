@@ -28,11 +28,12 @@ def make_planner(name,terrain,limits,checkpoint=None):
     raise ValueError('Unknown planner')
 
 
-def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planner_checkpoint=None,viewer=False):
+def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planner_checkpoint=None,viewer=False,ground='boxes',on_step=None):
+    """One planner episode in native MuJoCo. on_step(env), if given, is called after every control step (e.g. to render)."""
     torch.set_num_threads(2);torch.manual_seed(seed)
     policy,saved=load_controller(checkpoint)
-    cfg=EnvConfig(**saved['config']['env']);cfg=replace(cfg,num_envs=1,backend='native',device='cpu',seed=seed,noise=0.,episode_seconds=seconds,final_probability=0.)
-    env=GoalEnv(cfg,scene);terrain=Terrain.from_scene(scene);limits=Limits()
+    cfg=replace(EnvConfig(**saved['config']['env']),num_envs=1,backend='native',device='cpu',seed=seed,noise=0.,episode_seconds=seconds)
+    env=GoalEnv(cfg,scene,ground=ground);terrain=Terrain.from_scene(scene);limits=Limits()
     planner=make_planner(planner_name,terrain,limits,planner_checkpoint)
     goal=env.piles[[p['id'] for p in env.supports].index('P2')]
     current=None;decisions=[];trajectory=[];status='timeout';distance=0.;hold=0.
@@ -52,7 +53,7 @@ def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planne
                 if hold>=.5:status='success';break
             else:hold=0.
             reached=current is not None and float(torch.linalg.vector_norm(q[:2]-env.target[0,:2]))<cfg.arrival_radius
-            timed_out=float(env.target_elapsed[0])>=cfg.subgoal_seconds
+            timed_out=float(env.target_elapsed[0])>=float(env.target_budget[0])
             if current is None or (reached and not bool(env.final[0])) or timed_out:
                 obs=observe_pose(terrain,limits,q[:3],yaw,len(decisions),step*cfg.control_dt)
                 target=planner.select_subgoal(obs)
@@ -66,6 +67,7 @@ def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planne
                 decisions.append(dict(time_s=step*cfg.control_dt,target=target,x=pile.x,y=pile.y,reason='timeout' if timed_out else 'arrival' if reached else 'initial'))
             with torch.no_grad():action=policy.act(env.observations(noise=False)[0])
             _,_,_,done,info=env.step(action,auto_reset=False,chain=False)
+            if on_step:on_step(env)
             if handle:
                 if not handle.is_running():status='viewer_closed';break
                 handle.sync();time.sleep(max(0,cfg.control_dt-(time.monotonic()-started)))
@@ -76,17 +78,18 @@ def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planne
         if handle:handle.close()
     return dict(planner=planner_name,status=status,success=status=='success',seed=seed,scene=scene,
                 time_s=float(env.elapsed[0]),distance_m=distance,decisions=decisions,trajectory=trajectory,
-                checkpoint=str(Path(checkpoint).resolve()),physics='native-mujoco',model_config=vars(cfg))
+                checkpoint=str(Path(checkpoint).resolve()),physics='native-mujoco',ground=ground,model_config=vars(cfg))
 
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--checkpoint',required=True);p.add_argument('--planner',choices=['greedy','oracle','optimistic','learned'],default='optimistic')
     p.add_argument('--planner-checkpoint');p.add_argument('--family',choices=TERRAINS,default='open');p.add_argument('--row',type=int,default=0)
     p.add_argument('--seed',type=int,default=10000);p.add_argument('--scene');p.add_argument('--seconds',type=float,default=60);p.add_argument('--viewer',action='store_true')
+    p.add_argument('--ground',choices=['boxes','heightfield'],default='boxes',help='scene supports as boxes, or as the heightfield the controller senses')
     p.add_argument('--output',default='outputs/evaluation/episode.json');a=p.parse_args()
     if a.seconds<=0:p.error('Duration must be positive')
     scene=load_scene(a.scene) if a.scene else generate_terrain(a.family,a.row,a.seed)
-    result=evaluate(a.checkpoint,scene,a.planner,a.seconds,a.seed,a.planner_checkpoint,a.viewer)
+    result=evaluate(a.checkpoint,scene,a.planner,a.seconds,a.seed,a.planner_checkpoint,a.viewer,a.ground)
     path=Path(a.output);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps({k:result[k] for k in ['planner','status','time_s','distance_m']}));print(path)
 
