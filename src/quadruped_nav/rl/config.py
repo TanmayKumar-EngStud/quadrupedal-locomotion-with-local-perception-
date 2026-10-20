@@ -49,6 +49,9 @@ class EnvConfig:
     terrain_resolution: float = .05
     fine_terrain_resolution: float = .025   # cell size of the pile tiles (terrain_grid.FINE_TYPES)
     terrain_weights: list = None     # share of robots per terrain type (None: equal shares)
+    terrain_noise: float = 0.        # per-element irregularities: 0.5 for v3, 1.0 for v4 (see terrain_grid)
+    terrain_variants: int = 1        # independent tiles per (level, type); robots draw one at every reset
+    pile_pit_ramp: bool = False      # pile pits deepen with level (for runs that start from scratch)
     curriculum: bool = True          # per-robot level promotion / demotion
     max_start_level: int = 2         # robots start on rows 0..max_start_level
     # Physics and control.
@@ -88,6 +91,7 @@ class EnvConfig:
         if self.terrain_weights is not None and (len(self.terrain_weights) != len(self.terrain_types)
                                                  or min(self.terrain_weights) < 0 or sum(self.terrain_weights) <= 0):
             raise ValueError('terrain_weights needs one non-negative weight per terrain type')
+        if self.terrain_noise < 0 or self.terrain_variants < 1: raise ValueError('Invalid terrain noise or variants')
         if not 0 <= self.max_start_level < self.terrain_levels: raise ValueError('Invalid start level')
         if not 0 < self.target_distance[0] <= self.target_distance[1]: raise ValueError('Invalid target distance range')
         if self.target_distance[0] <= self.arrival_radius: raise ValueError('Targets must start outside the arrival radius')
@@ -114,6 +118,8 @@ class TrainConfig:
     hidden: list = field(default_factory=lambda: [512, 256, 128])
     checkpoint_every: int = 50
     evaluation_every: int = 50       # fixed-target evaluation on every terrain type
+    validation_seed: int = None      # run that evaluation on unseen tiles from this seed (None: training tiles)
+    max_hours: float = None          # stop after this much training time, whatever `updates` says
     output: str = "runs/goal-v3"
 
     @classmethod

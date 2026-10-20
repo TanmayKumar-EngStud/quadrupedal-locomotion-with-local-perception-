@@ -53,10 +53,11 @@ class Recorder:
         self.frames.append(image)
 
 
-def tile_rollout(checkpoint, recorder, terrain, level, seconds, seed):
+def tile_rollout(checkpoint, recorder, terrain, level, seconds, seed, noise=None):
     policy, saved = load_controller(checkpoint)
     cfg = replace(EnvConfig(**saved['config']['env']), num_envs=1, backend='native', device='cpu', noise=0., curriculum=False,
-                  seed=seed, episode_seconds=seconds + 1, max_speed=[.75, .75], terrain_types=[terrain], terrain_weights=None)
+                  seed=seed, episode_seconds=seconds + 1, max_speed=[.75, .75], terrain_types=[terrain], terrain_weights=None,
+                  terrain_variants=1, pile_pit_ramp=False, terrain_noise=noise or 0.)   # same terrain for both controllers
     env = GoalEnv(cfg)
     env.column[0], env.level[0] = 0, level
     env.reset(torch.tensor([0]))
@@ -102,6 +103,7 @@ def main():
     p.add_argument('--checkpoints', nargs=2, default=['artifacts/controller_v1/controller.pt', 'artifacts/controller_v2/controller.pt'])
     p.add_argument('--labels', nargs=2, default=['v1', 'v2'])
     p.add_argument('--terrain', default='piles'); p.add_argument('--level', type=int, default=2)
+    p.add_argument('--terrain-noise', type=float, help='tile mode: irregularity scale (0.5 = v3, 1.0 = v4)')
     p.add_argument('--family', default='open'); p.add_argument('--row', type=int, default=0)
     p.add_argument('--ground', choices=['boxes', 'heightfield'], default='boxes'); p.add_argument('--planner', default='oracle')
     p.add_argument('--seconds', type=float, default=12.); p.add_argument('--seed', type=int, default=3)
@@ -112,7 +114,7 @@ def main():
     recorders = []
     for checkpoint, label in zip(a.checkpoints, a.labels):
         recorder = Recorder(a.width, a.height, label)
-        if a.mode == 'tile': outcome = tile_rollout(checkpoint, recorder, a.terrain, a.level, a.seconds, a.seed)
+        if a.mode == 'tile': outcome = tile_rollout(checkpoint, recorder, a.terrain, a.level, a.seconds, a.seed, a.terrain_noise)
         else: outcome = scene_rollout(checkpoint, recorder, a.family, a.row, a.ground, a.planner, a.seconds, a.seed)
         print(label, outcome, flush=True)
         recorders.append(recorder)

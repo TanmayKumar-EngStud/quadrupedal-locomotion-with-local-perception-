@@ -29,7 +29,7 @@ def main():
     policy, saved = load_controller(a.checkpoint)
     cfg = replace(EnvConfig(**saved['config']['env']), num_envs=1, backend='native', device='cpu', noise=0.,
                   curriculum=False, seed=a.seed, episode_seconds=a.seconds + 1, max_speed=[.8, .8],
-                  terrain_types=[a.terrain], terrain_weights=None)
+                  terrain_types=[a.terrain], terrain_weights=None, terrain_variants=1)
     env = GoalEnv(cfg)
     env.column[0] = 0; env.level[0] = a.level
     env.reset(torch.tensor([0]))

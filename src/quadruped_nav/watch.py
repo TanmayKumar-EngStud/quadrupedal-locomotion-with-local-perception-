@@ -28,7 +28,7 @@ def build(checkpoint, terrain, level, speed, seed):
     # 8 m heightfield, about 51k triangles each, is what made the viewer lag.
     cfg = replace(EnvConfig(**saved['config']['env']), num_envs=1, backend='native', device='cpu', noise=0.,
                   curriculum=False, seed=seed, episode_seconds=1e9, max_speed=[speed, speed], terrain_types=[terrain],
-                  terrain_weights=None)
+                  terrain_weights=None, terrain_variants=1)
     env = GoalEnv(cfg)
     env.column[0], env.level[0] = 0, level
     env.reset(torch.tensor([0]))

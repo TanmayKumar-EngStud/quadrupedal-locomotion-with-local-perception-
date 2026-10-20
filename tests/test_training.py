@@ -9,7 +9,7 @@ from quadruped_nav.terrain import generate_terrain, TERRAINS
 from quadruped_nav.mjcf import build_mjcf
 from quadruped_nav.rl.config import EnvConfig, TrainConfig, OBSERVATION_SPEC, default_rewards
 from quadruped_nav.rl.env import GoalEnv, robots_per_type
-from quadruped_nav.rl.terrain_grid import TerrainGrid, HeightGrid, TERRAIN_TYPES, pile_pit_depth
+from quadruped_nav.rl.terrain_grid import TerrainGrid, HeightGrid, TERRAIN_TYPES, pile_pit_depth, pit_depth
 from quadruped_nav.rl.robot import build_training_model
 from quadruped_nav.rl.policy import load_controller, export_bundle
 from quadruped_nav.rl.ppo import Rollout, gae
@@ -125,6 +125,64 @@ def test_heightfield_scene_is_the_sensed_height_map(tmp_path):
         assert abs((3 - distance) - p['z_top']) < 1e-3
     obs, *_ = field.step(torch.zeros(1, 12))
     assert torch.isfinite(obs).all()
+
+
+def test_terrain_noise_is_reproducible_and_keeps_edges_and_spawn_platforms():
+    kinds = ('slope', 'stairs_up', 'stairs_down', 'obstacles', 'stepping_stones', 'gaps', 'piles')
+    regular = TerrainGrid(kinds, levels=3, tile_size=4., seed=2)
+    noisy = TerrainGrid(kinds, levels=3, tile_size=4., seed=2, noise=1.)
+    assert np.array_equal(noisy.heights, TerrainGrid(kinds, levels=3, tile_size=4., seed=2, noise=1.).heights)
+    assert np.array_equal(regular.heights, TerrainGrid(kinds, levels=3, tile_size=4., seed=2, noise=0.).heights)
+    regular_tiles, noisy_tiles = {t[0]: t[3] for t in regular.tiles()}, {t[0]: t[3] for t in noisy.tiles()}
+    for column, kind in enumerate(kinds):
+        for level in range(3):
+            name = f'tile_{level}_{column}'
+            if level or kind not in ('slope', 'stairs_up', 'stairs_down'):   # level-0 slopes have no level change to blur
+                assert not np.array_equal(regular_tiles[name], noisy_tiles[name]), name
+    assert (noisy.spawn_height == 0).all() == (regular.spawn_height == 0).all()
+    for column, kind in enumerate(kinds[:3]):            # slopes and stairs still end at height 0: no cliffs
+        tile = noisy_tiles[f'tile_2_{column}']
+        assert abs(tile[0]).max() < 1e-6 and abs(tile[:, 0]).max() < 1e-6, kind
+
+
+def test_noisy_stones_stay_above_their_pits_and_stairs_stay_walkable():
+    grid = TerrainGrid(('stepping_stones', 'piles', 'stairs_up'), levels=10, tile_size=4., seed=3, noise=1.)
+    for name, _, _, tile in grid.tiles():
+        level, column = map(int, name.split('_')[1:])
+        kind, d = grid.columns[column][0], level / 9
+        inner = tile[:-1, :-1]                           # the last row and column belong to the neighbouring tile
+        if kind == 'stairs_up':
+            risers = np.unique(np.round(abs(np.diff(inner, axis=0)), 4))
+            assert risers.max() <= .2 + 1e-6
+            continue
+        pit = pit_depth(d) if kind == 'stepping_stones' else pile_pit_depth(d)
+        tops = inner[inner > -pit + 1e-6]
+        assert tops.min() > -pit / 2, (name, tops.min())   # every stone node is far above the pit floor
+
+
+def test_tile_variants_and_robots_drawing_them():
+    grid = TerrainGrid(('piles',), levels=2, tile_size=4., seed=1, variants=3, noise=.5)
+    assert len(grid.columns) == 3 and grid.spawn_height.shape == (2, 3)
+    tiles = {t[0]: t[3] for t in grid.tiles()}
+    assert not np.array_equal(tiles['tile_1_0'], tiles['tile_1_1'])
+    env = GoalEnv(small_config(num_envs=16, terrain_types=['rough', 'piles'], tile_size=4., terrain_variants=2,
+                               terrain_noise=.5))
+    assert set(env.variant.tolist()) == {0, 1}
+    tile = env._tile(torch.arange(16))
+    assert int(tile.max()) < len(env.grid.columns)
+    q = env.backend.tensor('qpos')[:, :2]
+    tile_y = env.tile_y[tile]
+    assert ((q[:, 1] > tile_y) & (q[:, 1] < tile_y + 4.)).all()   # every robot stands on its own tile
+
+
+def test_time_budget_stops_training_and_validation_tiles_are_unseen(tmp_path):
+    cfg = TrainConfig(env=small_config(num_envs=2), updates=50, rollout_steps=2, epochs=1, minibatches=1, hidden=[16],
+                      checkpoint_every=10, evaluation_every=10, max_hours=1e-9, validation_seed=100,
+                      output=str(tmp_path / 'run'))
+    checkpoint = train(cfg)
+    _, saved = load_controller(checkpoint)
+    assert saved['update'] == 1 and (tmp_path / 'run/update_000001.pt').exists()
+    assert len((tmp_path / 'run/evaluation.jsonl').read_text().splitlines()) == 1
 
 
 def test_observation_contract_and_reward_bookkeeping():

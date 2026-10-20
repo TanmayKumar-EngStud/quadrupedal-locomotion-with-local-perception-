@@ -1,0 +1,16 @@
+{
+  "env": {
+    "num_envs": 4096, "backend": "warp", "device": "cuda:0", "seed": 0,
+    "terrain_types": ["rough", "slope", "stairs_up", "stairs_down", "obstacles", "stepping_stones", "gaps", "piles"],
+    "terrain_weights": [8, 8, 14, 10, 8, 15, 12, 25],
+    "terrain_resolution": 0.05, "fine_terrain_resolution": 0.025, "terrain_levels": 10,
+    "terrain_noise": 1.0, "terrain_variants": 2, "pile_pit_ramp": true,
+    "max_start_level": 2
+  },
+  "updates": 100000, "max_hours": 8, "validation_seed": 100,
+  "rollout_steps": 24, "epochs": 5, "minibatches": 4,
+  "learning_rate": 0.001, "desired_kl": 0.01, "gamma": 0.99, "gae_lambda": 0.95,
+  "entropy": 0.005, "hidden": [512, 256, 128],
+  "checkpoint_every": 25, "evaluation_every": 25,
+  "output": "runs/kth-controller-v4"
+}

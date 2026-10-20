@@ -104,7 +104,11 @@ def train(cfg, resume=None):
         first, steps = checkpoint['update'], checkpoint['steps']
 
     env = GoalEnv(cfg.env)
-    evaluator = TerrainEvaluator(cfg.env, grid=env.grid) if cfg.evaluation_every else None
+    evaluator = None
+    if cfg.evaluation_every:
+        # Unseen validation tiles when validation_seed is set, else the training tiles.
+        evaluator = (TerrainEvaluator(cfg.env, seed=cfg.validation_seed) if cfg.validation_seed is not None
+                     else TerrainEvaluator(cfg.env, grid=env.grid))
     obs, critic_obs = env.observations()
     if not resume:
         model.actor_norm.update(obs); model.critic_norm.update(critic_obs)
@@ -152,15 +156,20 @@ def train(cfg, resume=None):
                           if k in ('update', 'steps', 'mean_reward', 'samples_per_second', 'arrivals_per_10k', 'falls_per_10k',
                                    'target_success_rate', 'mean_level', 'mean_velocity_toward_target')}), flush=True)
 
-        if evaluator and ((update + 1) % cfg.evaluation_every == 0 or update + 1 == cfg.updates or update == first):
+        out_of_time = cfg.max_hours is not None and time.monotonic() - started >= cfg.max_hours * 3600
+        last = update + 1 == cfg.updates or out_of_time
+        if evaluator and ((update + 1) % cfg.evaluation_every == 0 or last or update == first):
             evaluation = evaluator.run(model)
             evaluation.update(update=update + 1, steps=steps)
             with (out / 'evaluation.jsonl').open('a') as f: f.write(json.dumps(evaluation) + '\n')
             print(json.dumps({'evaluation_update': update + 1, **evaluation['overall']}), flush=True)
-        if (update + 1) % cfg.checkpoint_every == 0 or update + 1 == cfg.updates:
+        if (update + 1) % cfg.checkpoint_every == 0 or last:
             save_checkpoint(out / 'last.pt', model, ppo, cfg, update + 1, steps, revision)
-            if (update + 1) % (cfg.checkpoint_every * 10) == 0 or update + 1 == cfg.updates:
+            if (update + 1) % (cfg.checkpoint_every * 10) == 0 or last:
                 save_checkpoint(out / f'update_{update + 1:06d}.pt', model, ppo, cfg, update + 1, steps, revision)
+        if out_of_time:
+            print(f'Training time budget of {cfg.max_hours} h reached at update {update + 1}', flush=True)
+            break
     return out / 'last.pt'
 
 
