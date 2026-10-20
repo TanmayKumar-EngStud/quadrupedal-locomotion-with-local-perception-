@@ -77,7 +77,7 @@ slowed the command when the target was behind (turn first). Robots then learned
 to face away from their targets, which shrank the command, and standing still
 earned about 90% of the tracking reward (training attempt 5).
 
-**Rewards (src/quadruped_nav/rl/rewards.py).**
+**Rewards (src/quadruped_nav/rl/rewards.py; every weight and parameter is in `reward_config()` there).**
 - Task: velocity tracking toward the target (1.5), yaw-rate tracking (0.75),
   velocity toward the target (0.5, never switched off), +10 per target reached,
   -10 per fall and +1 per second alive.
