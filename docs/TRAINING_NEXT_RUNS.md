@@ -1,144 +1,164 @@
 # Training the next controllers (v3 and v4, RQ1)
 
-Written October 19, 2026. This is the step-by-step guide for the RQ1 runs in the
-proposal: two controllers trained **from scratch for 8 hours each**, identical except
-for the amount of Gaussian noise in the training-terrain parameters (v3 moderate,
-v4 high), and compared against v2. Background on the training recipe and on every
-pitfall found so far: [GOAL_REACHING_V3.md](GOAL_REACHING_V3.md). Server setup:
+Updated October 20, 2026. RQ1 compares two controllers trained **from scratch for
+8 hours each**, identical except for the size of the terrain irregularities (v3
+moderate, v4 high), against v2. Background on the training recipe and every pitfall
+found so far: [GOAL_REACHING_V3.md](GOAL_REACHING_V3.md). Server setup in general:
 [RUNBOOK.md](RUNBOOK.md) sections 2-4.
 
-Steps 1-2 are code changes that do not exist yet (owners from the proposal). Steps
-3-8 use commands that work today.
+## What is implemented
 
-## 1. Terrain changes (Amedeo)
+| Setting (in `env` of the run config) | v3 | v4 | Meaning |
+| --- | --- | --- | --- |
+| `terrain_noise` | 0.5 | 1.0 | size of the per-element irregularities (0 = the regular v1/v2 terrain) |
+| `terrain_variants` | 2 | 2 | independent tiles per level and type; each robot draws one at every reset |
+| `pile_pit_ramp` | true | true | pile pits deepen from 5 cm (level 0) to 0.5 m (level 5), for runs from scratch |
+| `terrain_weights` | 8/8/14/10/8/15/12/25 | same | share of robots per type (rough, slope, stairs up, stairs down, obstacles, stepping stones, gaps, piles) |
+| `max_start_level` | 2 | 2 | from scratch: robots start on levels 0-2 |
 
-All terrain lives in `src/quadruped_nav/rl/terrain_grid.py`. Each tile generator
-(`rough_tile`, `stairs_tile`, `stepping_stones_tile`, `gaps_tile`, `piles_tile`, ...)
-takes a difficulty `d` in [0, 1]; level `L` uses `d = L / 9`.
-
-- **Re-spaced levels.** Change how `d` maps to step height, stone size, gap width
-  and pit depth so each level is a step robots can actually climb. Evidence: in v2
-  every pile robot stayed on level 0, and v1's stepping stones reached level 0.35.
-- **Gaussian parameter noise.** Add a noise setting to `EnvConfig`
-  (`src/quadruped_nav/rl/config.py`), e.g. `terrain_noise` in units of one level's
-  change: 0.5 for v3, 1.0 for v4. Perturb each tile's parameters (riser height,
-  tread depth, slope, stone size, gap width, pit depth, roughness, block height), and
-  individual steps and stones within a tile.
-- **More tile variants.** The grid builds one tile per (level, type) once, at start-up.
-  With noise, one tile per cell gives only one noise sample per cell, so build
-  several variants per (level, type), e.g. extra copies of each column. Memory is not
-  the limit: 80 tiles at 2.5-5 cm cells use about 40 MB.
-- **Held-out test terrain.** `goal_check` already builds its terrain from seed
-  12345, while training uses `seed: 0`, so its tiles are never trained on. Build the
-  noisy test set the same way, with a seed no training run uses.
-- **Warning for from-scratch runs.** v2 has 0.5 m pits on every pile level, which
-  worked because v2 started from a walking v1. From scratch, deep pits on the easiest
-  level stalled learning before (phase 1 of v1: stepping-stone success near 0%).
-  Give piles a pit-depth ramp at the lowest levels, or check in the probe run (step 4)
-  that pile robots leave level 0.
-
-## 2. Reward and PPO changes (Damien)
-
-- **New reward terms** (edge penalty: stance feet near a drop; stumble penalty: toes
-  catching stair risers; optional arrival-speed penalty). For each term: add a
-  function to `src/quadruped_nav/rl/rewards.py` and its name to `DENSE`, add its
-  weight to `default_rewards()` in `config.py` (unknown names are rejected), and pass
-  any new quantity it needs through the state built in `GoalEnv.step`
-  (`src/quadruped_nav/rl/env.py`).
-- **Lower entropy bonus.** `entropy` in the run config (currently 0.005); try 0.001.
-  During the v2 fine-tune the action std rose from 0.81 to 0.98.
-- Keep a change only if a 30-minute probe (step 4) shows it reduces the failure it
-  targets without slowing the robot (`mean_velocity_toward_target`).
-
-## 3. Local checks (any laptop, CPU)
-
-```sh
-uv sync --extra train --frozen
-uv run --extra train pytest -q                                   # all tests must pass
-uv run --extra train quad-train --config configs/smoke.json --output runs/my-smoke
-uv run --extra train python scripts/render_rollout.py --checkpoint artifacts/controller_v2/controller.pt \
-    --terrain piles --level 3 --output outputs/rollouts/check.gif   # look at the new terrain
-```
-
-Add a test for every new terrain or reward feature (see `tests/test_training.py`).
-
-## 4. GPU preflight and 30-minute probes (KTH JupyterHub)
-
-Bring the server checkout to the branch first. It holds files that were uploaded by
-hand during development, so run `git stash && git pull` there (the stash keeps those
-copies), or make a fresh clone and run `scripts/cloud_setup.sh` in it. Then:
-
-```sh
-bash scripts/cloud_setup.sh                               # CUDA check, CPU/GPU parity, short GPU run
-.venv/bin/python -m quadruped_nav.train --config configs/kth-controller-v3.json \
-    --output runs/v3-probe --updates 600                  # about 30 min
-```
-
-Check in `runs/v3-probe/metrics.jsonl` (or `python scripts/plot_training.py runs/v3-probe`):
-
-| Field | Healthy | Problem seen before |
+| Setting (top level of the run config) | v3 and v4 | Meaning |
 | --- | --- | --- |
-| `unstable_per_10k` | below about 2 (v1, v2: 0.1-1.5) | robots far from a single large heightfield blew up (fixed: one heightfield per tile) |
-| `level_by_type` | rises for every type | stuck at 0: no promotion (v2 piles, v1 stepping stones) |
-| `ppo.learning_rate`, `ppo.kl` | learning rate mostly 1e-4 to 1e-3 (short dips are normal) | stuck at 1e-5: normalizer updated mid-rollout |
-| `ppo.action_std` | slowly falling | rising: too much entropy bonus |
-| `mean_velocity_toward_target` | towards 0.5-1 m/s | near 0: "standing still pays" (see GOAL_REACHING_V3.md) |
-| `samples_per_second` | about 30,000-40,000 on the 10 GB slice | |
+| `max_hours` | 8 | training stops after 8 hours, whatever the GPU speed (`updates` is only an upper limit) |
+| `validation_seed` | 100 | the fixed test every 25 updates runs on unseen tiles from seed 100 (validation set) |
 
-Also time an update: `collect_seconds + learn_seconds` (about 2.4 s on the 10 GB
-slice; about 3 s with the fixed test every 25 updates).
+Configs: `configs/kth-controller-v3.json` and `configs/kth-controller-v4.json`
+differ only in `terrain_noise` and `output`.
 
-## 5. Configs for the two runs
+**Irregularities** (`src/quadruped_nav/rl/terrain_grid.py`). Every terrain element
+gets its own truncated Gaussian deviations (clipped at 2.5 sigma, then to physical
+limits). sigma = `terrain_noise` x the unit below; "one level's change" is how much
+the nominal value moves from one level to the next.
 
-Copy `configs/kth-controller-v2.json` to `configs/kth-controller-v3.json` and
-`configs/kth-controller-v4.json` and change:
+| Terrain | Parameters per element | Unit (sigma at noise 1.0) | Limits |
+| --- | --- | --- | --- |
+| stepping stones, piles | width, length | one level's size change (3.3 cm / 4.2 cm) | 0.10 m to the lattice spacing |
+| | height | min(2 cm, pit depth / 10) | stays far above the pit |
+| | centre x, y in its lattice cell | half the level's gap | stays inside its cell (gaps may close) |
+| | tilt about x, y | 6 degrees | at most 15 degrees; corners move at most pit / 8 |
+| stairs up / down | riser height, tread depth (every step) | 1.3 cm (one level's change), 5 cm | riser 2-20 cm, tread at least 20 cm |
+| obstacles | block width, length; height; tilt about x, y | 10 cm; 1.3 cm; 6 degrees | size 0.2-1.2 m, tilt at most 15 degrees |
+| gaps | hole width, length, centre x, y | 5 cm | hole size 0.15-0.45 m |
+| slope | slope along x and along y (per tile) | one level's change (2.5 degrees) | rise/run 0.02-0.55 |
+| rough | unchanged (already random everywhere) | | |
 
-- `output`: `runs/kth-controller-v3` / `runs/kth-controller-v4`;
-- the noise setting from step 1 (0.5 / 1.0); everything else identical, same `seed`;
-- `entropy` and reward weights chosen in step 2;
-- `max_start_level`: 2 for from-scratch runs (9 was for fine-tuning a walking policy);
-- `updates`: fill the 8-hour budget. 8 h = 28,800 s; at about 3 s per update that is
-  about 9,500 updates. Use the update time measured in the probe on the partition you
-  actually get. Two runs sharing one GPU each run at about half speed.
+See the effect: `python scripts/preview_terrain.py --pile-pit-ramp` writes
+`outputs/terrain_preview.png` (3 m windows of every type at levels 0, 5, 9 and noise
+0, 0.5, 1.0).
 
-## 6. Launch (from scratch: no `--resume`)
+**Not included yet** (team plan, RQ1): re-spaced difficulty levels (Amedeo), the edge
+and stumble penalties, the lower entropy bonus and the relaxed demotion rule
+(Damien). If any of them is added, v3 and v4 must both be trained with it, so that
+the noise stays the only difference between them.
+
+## Steps to train v3 on the KTH GPU
+
+Run these in a JupyterLab terminal on the GPU server, in the repository folder.
+
+### 1. Get the code
+
+The server checkout may hold files that were uploaded by hand during development;
+`git stash` keeps those copies before updating.
+
+```sh
+cd "$HOME/RL&EAI/Project/Language-Guided-Quadrupedal-Navigation"   # or wherever the repository is
+git stash
+git fetch origin
+git checkout tanmay
+git pull origin tanmay
+git log --oneline -1                                               # should show the terrain-irregularity commit
+```
+
+On a fresh machine instead: `git clone -b tanmay https://github.com/TanmayKumar-EngStud/Language-Guided-Quadrupedal-Navigation.git`.
+
+### 2. Environment and GPU check
+
+```sh
+bash scripts/cloud_setup.sh          # installs uv if needed, uv sync --extra cloud, CPU/GPU parity check, 3-update GPU run
+.venv/bin/python -m pytest -q        # all tests must pass
+```
+
+### 3. Probe run (about 5 minutes)
+
+```sh
+.venv/bin/python -m quadruped_nav.train --config configs/kth-controller-v3.json \
+    --output runs/v3-probe --updates 40
+```
+
+Check the last lines of the output (and `runs/v3-probe/metrics.jsonl`):
+
+- no `Traceback` or `NaN`;
+- `samples_per_second` (about 30,000-40,000 on the 10 GB slice; a larger GPU should be faster);
+- in `metrics.jsonl`: `unstable_per_10k` below about 2, `contact_overflow.worlds_at_constraint_capacity` 0.
+
+Then delete the probe: `rm -r runs/v3-probe`.
+
+### 4. Launch the 8-hour run
 
 ```sh
 setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-controller-v3.json \
     > runs/kth-controller-v3.log 2>&1 < /dev/null &
-setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-controller-v4.json \
-    > runs/kth-controller-v4.log 2>&1 < /dev/null &
 ```
 
-`setsid nohup ... < /dev/null &` keeps the jobs alive when the browser terminal
-closes. The output folder must not already contain `last.pt`. Checkpoints:
-`last.pt` every 25 updates, `update_XXXXXX.pt` every 250. The pod has 24 GB RAM: keep
-CPU jobs running beside training (e.g. calibration) to 5 workers or fewer, or the pod
-restarts and kills everything.
+`setsid nohup ... < /dev/null &` keeps the run alive when the browser or terminal
+closes. The run stops by itself after 8 hours (`max_hours`) and saves
+`runs/kth-controller-v3/last.pt` and `update_XXXXXX.pt`. To train v4 at the same time
+on a GPU with enough memory (each run uses about 3-4 GB), start the same command with
+`kth-controller-v4`. On the 24 GB pod, keep CPU jobs beside training to 5 workers or
+fewer.
 
-## 7. Monitor during the 8 hours
-
-- `tail -f runs/kth-controller-v3.log` prints one line per update.
-- `runs/<run>/evaluation.jsonl` gets the fixed terrain test every 25 updates.
-- `python scripts/plot_training.py runs/kth-controller-v3` writes the dashboard figures.
-- If a run crashes, resume it with `--resume runs/<run>/last.pt` and the same config.
-
-## 8. Export, download, evaluate, freeze (19-21 Oct)
+### 5. Monitor
 
 ```sh
-# on the server
-.venv/bin/python -m quadruped_nav.train --export runs/kth-controller-v3/last.pt --bundle artifacts/controller_v3
-# download artifacts/controller_v3.zip (JupyterLab file browser: right click, Download), then locally:
-unzip artifacts/controller_v3.zip -d artifacts/controller_v3   # manifest.json holds SHA-256 hashes to check
-C=artifacts/controller_v3/controller.pt
-uv run --extra train python -m quadruped_nav.goal_check --checkpoint $C \
-    --terrain-types rough slope stairs_up stairs_down obstacles stepping_stones gaps --output outputs/evaluation/fixed_v3_v1types.json
-uv run --extra train python -m quadruped_nav.goal_check --checkpoint $C --terrain-types piles --output outputs/evaluation/fixed_v3_piles.json
-uv run --extra train python -m quadruped_nav.calibrate --workers 5 --checkpoint $C --output outputs/calibration/hops_v3.json
-uv run --extra train python -m quadruped_nav.calibrate --workers 5 --checkpoint $C --ground heightfield --output outputs/calibration/hops_v3_heightfield.json
+tail -n 3 runs/kth-controller-v3.log                       # one line per update
+.venv/bin/python scripts/plot_training.py runs/kth-controller-v3   # dashboard figures (needs matplotlib)
 ```
 
-Then add v3 and v4 to `outputs/comparison/make_charts.sh` and run it, and render
-side-by-side clips against v2 with `scripts/render_compare.py`. Freeze the controller
-with the best hop success on the pile rows used for RQ2, and re-run the calibrated RQ2
-experiments with its hop table.
+| Field in `metrics.jsonl` | Healthy | Problem seen before |
+| --- | --- | --- |
+| `level_by_type` | rises for every type over the hours | stuck at 0 (v2 piles, v1 stepping stones) |
+| `target_success_rate` | rises within the first few hundred updates | near 0: robots stand still |
+| `mean_velocity_toward_target` | towards 0.5-1 m/s | near 0: "standing still pays" |
+| `unstable_per_10k` | below about 2 | robots blowing up |
+| `ppo.learning_rate` | mostly 1e-4 to 1e-3, short dips are normal | stuck at 1e-5 |
+| `ppo.action_std` | slowly falling | rising: too much exploration |
+
+`runs/kth-controller-v3/evaluation.jsonl` holds the fixed test on the validation
+tiles every 25 updates. If the run crashes, resume it:
+`--resume runs/kth-controller-v3/last.pt` with the same config. The 8-hour clock
+restarts on resume, so lower `max_hours` by the time already trained.
+
+### 6. Export and download
+
+```sh
+.venv/bin/python -m quadruped_nav.train --export runs/kth-controller-v3/last.pt --bundle artifacts/controller_v3
+```
+
+Download `artifacts/controller_v3.zip` (JupyterLab file browser: right click,
+Download), then on the laptop:
+
+```sh
+unzip artifacts/controller_v3.zip -d artifacts/controller_v3     # manifest.json holds SHA-256 hashes to check
+```
+
+### 7. Evaluate (laptop, CPU)
+
+Use the validation seed (100) for any choice between checkpoints, and the test seed
+(12345, the default) only for the final numbers. The same terrain for every
+controller comes from `--terrain-from`:
+
+```sh
+C=artifacts/controller_v3/controller.pt
+# test matrix: repeat for v2, v3, v4 and noise 0, 0.5, 1.0, 1.5
+uv run --extra train python -m quadruped_nav.goal_check --checkpoint $C \
+    --terrain-from configs/kth-controller-v3.json --terrain-noise 0.5 --output outputs/evaluation/fixed_v3_noise0.5.json
+# hop tables on the pile scenes
+uv run --extra train python -m quadruped_nav.calibrate --workers 5 --checkpoint $C --output outputs/calibration/hops_v3.json
+uv run --extra train python -m quadruped_nav.calibrate --workers 5 --checkpoint $C --ground heightfield \
+    --output outputs/calibration/hops_v3_heightfield.json
+# side-by-side clip against v2 on irregular piles
+uv run --extra train python scripts/render_compare.py tile --checkpoints artifacts/controller_v2/controller.pt $C \
+    --labels v2 v3 --terrain piles --level 2 --terrain-noise 0.5 --output outputs/comparison/clips/piles_v2_v3.mp4
+```
+
+Add v3 and v4 to `outputs/comparison/make_charts.sh` and run it for the charts.
+Freeze the controller with the best hop success on the pile rows used for RQ2.

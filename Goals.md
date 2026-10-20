@@ -50,3 +50,14 @@ Controller v1 (3,000 PPO updates, 295M transitions) reaches 86% of the fixed-tes
 | Train v3 and v4 for 8 hours each | Tanmay, Amedeo, Damien | [ ] | — |
 
 The guide is [TRAINING_NEXT_RUNS.md](docs/TRAINING_NEXT_RUNS.md).
+
+## October 20, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Gaussian terrain irregularities per terrain element, tile variants, 8-hour time budget and validation tiles; v3/v4 configs | Tanmay | [X] | Not recorded |
+| Re-spaced terrain levels (RQ1, continued from October 19) | Amedeo | [ ] | — |
+| Train v3 for 8 hours on the KTH GPU | Tanmay | [ ] | — |
+| Train v4 for 8 hours on the KTH GPU | Tanmay, Amedeo, Damien | [ ] | — |
+
+`terrain_noise` adds per-element Gaussian deviations (width, length, height, centre position, tilt; risers and treads for stairs) to every training terrain except rough ground; 0.5 for v3, 1.0 for v4. With noise 0 the terrain is unchanged from v1/v2. Steps to run: [TRAINING_NEXT_RUNS.md](docs/TRAINING_NEXT_RUNS.md). Validated with unit tests (68 pass), a terrain preview and a CPU smoke run; not yet run on the GPU.

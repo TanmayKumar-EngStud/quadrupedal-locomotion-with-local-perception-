@@ -75,7 +75,8 @@ class GoalEnv:
         if scene is None:
             self.grid = grid or TerrainGrid(cfg.terrain_types, cfg.terrain_levels, cfg.tile_size,
                                             cfg.terrain_resolution, seed=cfg.seed,
-                                            fine_resolution=cfg.fine_terrain_resolution)
+                                            fine_resolution=cfg.fine_terrain_resolution, noise=cfg.terrain_noise,
+                                            variants=cfg.terrain_variants, pile_pit_ramp=cfg.pile_pit_ramp)
             self.model = build_training_model(self.grid)
             self.terrain = self.grid.height_grid(self.device)
         else:
@@ -135,13 +136,18 @@ class GoalEnv:
                 counts = torch.as_tensor(robots_per_type(self.n, cfg.terrain_weights), device=self.device)
                 self.column = torch.repeat_interleave(torch.arange(len(self.grid.types), device=self.device), counts)
             self.level = torch.randint(0, cfg.max_start_level + 1, (self.n,), device=self.device, generator=self.generator)
-            self.hole_threshold = torch.tensor(self.grid.hole_threshold, device=self.device)   # [level, type]
+            self.variant = torch.zeros(self.n, dtype=torch.long, device=self.device)   # tile copy, drawn at reset
+            self.hole_threshold = torch.tensor(self.grid.hole_threshold, device=self.device)   # [level, tile column]
             self.tile_x = torch.tensor(self.grid.origin_x, dtype=torch.float32, device=self.device)
             self.tile_y = torch.tensor(self.grid.origin_y, dtype=torch.float32, device=self.device)
         self.reset(torch.arange(self.n, device=self.device))
 
     # ------------------------------------------------------------------ utils
     def rand(self, *shape): return torch.rand(shape, device=self.device, generator=self.generator)
+
+    def _tile(self, ids):
+        """Grid column of each robot's tile: its terrain type and its tile variant."""
+        return self.column[ids] * self.grid.variants + self.variant[ids]
 
     def uniform(self, bounds, *shape): return bounds[0] + (bounds[1] - bounds[0]) * self.rand(*shape)
 
@@ -221,7 +227,9 @@ class GoalEnv:
         cfg, count = self.cfg, len(ids)
         q = self.home.repeat(count, 1)
         if self.grid is not None:
-            spawn = self.centres[self.level[ids], self.column[ids]]
+            if self.grid.variants > 1:
+                self.variant[ids] = torch.randint(0, self.grid.variants, (count,), device=self.device, generator=self.generator)
+            spawn = self.centres[self.level[ids], self._tile(ids)]
             q[:, :2] = spawn[:, :2] + (self.rand(count, 2) - .5) * 1.
             q[:, 2] = self.terrain.sample(q[:, :2]) + STANDING_HEIGHT + .02
             yaw = (2 * self.rand(count) - 1) * math.pi
@@ -254,10 +262,10 @@ class GoalEnv:
             angle = (2 * self.rand(count, candidates) - 1) * math.pi
             radius = self.uniform(cfg.target_distance, count, candidates)
             xy = pos[:, None] + radius[..., None] * torch.stack([angle.cos(), angle.sin()], -1)
-            low = torch.stack([self.tile_x[self.level[ids]], self.tile_y[self.column[ids]]], -1)   # tile corner
+            low = torch.stack([self.tile_x[self.level[ids]], self.tile_y[self._tile(ids)]], -1)   # tile corner
             xy = torch.maximum(torch.minimum(xy, (low + cfg.tile_size - .5)[:, None]), (low + .5)[:, None])
             far_enough = torch.linalg.vector_norm(xy - pos[:, None], dim=-1) >= .75 * cfg.target_distance[0]
-            in_hole = self.terrain.sample(xy) < self.hole_threshold[self.level[ids], self.column[ids]][:, None]
+            in_hole = self.terrain.sample(xy) < self.hole_threshold[self.level[ids], self._tile(ids)][:, None]
             valid = far_enough & ~in_hole
             first = torch.where(valid.any(-1), valid.float().argmax(-1), torch.full((count,), candidates - 1, device=self.device))
             xy = xy[torch.arange(count, device=self.device), first]
