@@ -7,7 +7,7 @@ import mujoco
 torch = pytest.importorskip('torch')
 from quadruped_nav.terrain import generate_terrain, TERRAINS
 from quadruped_nav.mjcf import build_mjcf
-from quadruped_nav.rl.config import EnvConfig, TrainConfig, OBSERVATION_SPEC, default_rewards
+from quadruped_nav.rl.config import EnvConfig, TrainConfig, OBSERVATION_SPEC, default_rewards, default_reward_params
 from quadruped_nav.rl.env import GoalEnv, robots_per_type
 from quadruped_nav.rl.terrain_grid import TerrainGrid, HeightGrid, TERRAIN_TYPES, pile_pit_depth, pit_depth
 from quadruped_nav.rl.robot import build_training_model
@@ -188,13 +188,25 @@ def test_time_budget_stops_training_and_validation_tiles_are_unseen(tmp_path):
 def test_arrival_speed_and_feet_in_gap_penalties():
     state = SimpleNamespace(speed_xy=torch.tensor([.4, 1., 1.5, 1.5]), newly_arrived=torch.tensor([True, True, True, False]),
                             foot_depth=torch.tensor([[0., .01, .05, .5]] * 4))
-    assert torch.allclose(rewards.arrival_speed(state), torch.tensor([0., .25, 1., 0.]))   # only on arrival, only above 0.5 m/s
-    assert torch.allclose(rewards.feet_in_gap(state), torch.full((4,), .02 + .07))          # 3 cm deadband, 10 cm cap
+    params = default_reward_params()
+    assert torch.allclose(rewards._reward_arrival_speed(state, params), torch.tensor([0., .25, 1., 0.]))   # only on arrival, above 0.5 m/s
+    assert torch.allclose(rewards._reward_feet_in_gap(state, params), torch.full((4,), .02 + .07))          # 3 cm deadband, 10 cm cap
     weights = {**default_rewards(), 'arrival_speed': -10., 'feet_in_gap': -20.}
     env = GoalEnv(small_config(num_envs=2, terrain_types=['rough'], rewards=weights))
     for _ in range(5):
         _, _, _, _, info = env.step(torch.zeros(2, 12))
     assert float(info['reward_terms']['feet_in_gap'].abs().max()) < 1e-6    # standing on level ground costs nothing
+
+
+def test_run_configs_change_only_the_reward_values_they_list():
+    cfg = EnvConfig(rewards={'feet_in_gap': -20.}, reward_params={'gap_deadband': .05})
+    assert cfg.rewards == {**default_rewards(), 'feet_in_gap': -20.}
+    assert cfg.reward_params == {**default_reward_params(), 'gap_deadband': .05}
+    assert list(cfg.rewards) == list(default_rewards())          # terms are added in reward_config() order
+    assert set(rewards.TERMS) == set(default_rewards())          # one _reward_<name>() per weight
+    state = SimpleNamespace(foot_depth=torch.tensor([[.04, 0., 0., 0.]]))
+    assert float(rewards._reward_feet_in_gap(state, cfg.reward_params)) == 0.   # 4 cm is inside the new 5 cm deadband
+    with pytest.raises(ValueError): EnvConfig(reward_params={'tracking_sigmaa': .3}).validate()
 
 
 def test_observation_contract_and_reward_bookkeeping():
@@ -217,9 +229,10 @@ def test_standing_still_earns_less_than_walking_to_the_target():
                                ang_vel_body=torch.zeros(1, 3), command=command, target_direction=torch.tensor([[1., 0.]]),
                                max_speed=torch.tensor([.8]), moving=torch.tensor([True]))
     still, walking = state(0.), state(.8)
-    total = lambda s: sum(default_rewards()[n] * getattr(rewards, n)(s) for n in ('tracking_lin_vel', 'tracking_ang_vel', 'goal_progress'))
+    total = lambda s: sum(default_rewards()[n] * rewards.TERMS[n](s, default_reward_params())
+                          for n in ('tracking_lin_vel', 'tracking_ang_vel', 'goal_progress'))
     assert float(total(walking)) > 3 * float(total(still))
-    assert float(rewards.goal_progress(state(-.5))) < 0   # walking away is penalised
+    assert float(rewards._reward_goal_progress(state(-.5), default_reward_params())) < 0   # walking away is penalised
 
 
 def test_arrival_is_paid_once_then_holds_then_chains_a_new_target():

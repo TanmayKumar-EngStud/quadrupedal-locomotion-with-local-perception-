@@ -1,70 +1,215 @@
-"""Reward terms for goal-reaching locomotion, in physical units before weighting.
+"""Reward function of the goal-reaching controller, laid out like Lab 1 Level C.
 
-Every function takes the step's quantities and returns one value per robot.
-The environment multiplies dense terms by their weight and the control
-timestep; 'arrival' and 'fall' are event rewards paid once.
+HOW TO TUNE IT
+  * reward_config() below holds every reward weight ("scales") and every shaping
+    parameter ("params"), grouped by purpose. Positive weights reward a behaviour,
+    negative weights penalise it, and 0 disables the term.
+  * To change them for one training run, add "rewards" (weights) and/or
+    "reward_params" (shaping parameters) to the "env" block of the run config,
+    e.g. configs/kth-controller-v3.json. List only the values you change; every
+    other value keeps its default from reward_config().
+  * Each weight belongs to the _reward_<name>() function with the same name,
+    further down. Those functions return physical quantities (m/s, rad, m, ...)
+    before weighting.
 
-Why the policy cannot settle for "standing still is good enough":
+HOW THE TOTAL IS FORMED (every control step, 50 times per second)
+  reward = sum of  weight x _reward_<name>() x dt   over the per-second terms
+         + sum of  weight x _reward_<name>()        over the event terms
+  Event terms (arrival, fall, arrival_speed) are paid once, when the event
+  happens, so they are not multiplied by the control timestep dt.
+
+WHY THE ROBOT CANNOT SETTLE FOR "STANDING STILL IS GOOD ENOUGH"
   * the commanded velocity points at the target, so standing still earns only
-    exp(-|v_cmd|^2/0.25) of the tracking reward (0.08 at 0.8 m/s), while moving
-    correctly earns 1.0;
+    exp(-|v_cmd|^2 / tracking_sigma) of the tracking reward (0.08 at 0.8 m/s),
+    while moving correctly earns 1.0;
   * goal_progress pays for velocity toward the target and is never switched off;
   * reaching the target pays a large one-off bonus, and a new target follows.
-
-Rewards are not clipped at zero: with exploration noise the gait penalties
-exceed the tracking reward at the start of training, and a zero clip would then
-hide every learning signal except falls. Instead a small 'alive' reward keeps
-surviving positive and the -10 fall penalty makes ending the episode costly.
+  Rewards are not clipped at zero: with exploration noise the gait penalties
+  exceed the tracking reward at the start of training, and a zero clip would then
+  hide every learning signal except falls. The small 'alive' reward keeps
+  surviving positive, and the -10 fall penalty makes ending the episode costly.
 """
 import torch
 
-TRACKING_SIGMA = .25
-AIR_TIME_TARGET = .25        # seconds; Go1 swings are short
-KNEE_CLEARANCE = .04
-ARRIVAL_SPEED_LIMIT = .5     # m/s; the guidance command is about 0.4 m/s at the arrival circle
-# Metres a foot may sit below the support next to it before it counts. On v2's pile-scene runs feet sat
-# at most 2.6 cm below it in successful episodes, and 10-37 cm in the last second before 10 of 12 falls.
-GAP_DEADBAND, GAP_CAP = .03, .10
+
+def reward_config():
+    """Default reward weights and shaping parameters (edit here, or override them in a run config)."""
+    return dict(
+        ### ----- REWARD WEIGHTS ----- ###
+        scales=dict(
+            # 1. Reach the target.
+            alive=1.0,               # Per second survived: surviving is worth more than ending the episode.
+            tracking_lin_vel=1.5,    # Match the commanded velocity toward the target (body frame).
+            tracking_ang_vel=0.75,   # Match the commanded turning rate (turn to face the target).
+            goal_progress=0.5,       # Velocity toward the target in m/s, capped at the commanded speed.
+            arrival=10.0,            # EVENT: once for every target reached.
+
+            # 2. Keep the body controlled.
+            lin_vel_z=-2.0,          # Penalise vertical bouncing.
+            ang_vel_xy=-0.05,        # Penalise roll and pitch rotation.
+            orientation=-0.5,        # Penalise body tilt.
+
+            # 3. Shape foot placement and gait.
+            feet_air_time=0.5,       # Reward swings longer than air_time_target, paid on touchdown.
+            feet_slip=-0.1,          # Penalise feet sliding while in contact.
+            knee_collision=-1.0,     # Penalise knees closer than knee_clearance to the terrain.
+            stand_still=-0.5,        # Penalise joint deviation from the standing pose while holding at a target.
+
+            # 4. Encourage smooth, efficient control.
+            torques=-1e-4,           # Penalise large motor torques.
+            dof_acc=-2.5e-7,         # Penalise joint accelerations.
+            action_rate=-0.01,       # Penalise abrupt changes between consecutive actions.
+
+            # 5. Discourage unsafe or failed behaviour.
+            dof_pos_limits=-10.0,    # Penalise joints beyond 95% of their range.
+            feet_in_gap=0.0,         # Penalise feet sitting in gaps (see gap_deadband). Off here; -20 in v3/v4.
+            fall=-10.0,              # EVENT: once, when the robot falls (the episode ends).
+            arrival_speed=0.0,       # EVENT: penalise arriving faster than arrival_speed_limit. Off here; -10 in v3/v4.
+        ),
+        ### ----- SHAPING PARAMETERS ----- ###
+        params=dict(
+            tracking_sigma=0.25,         # Smaller means stricter velocity tracking.
+            air_time_target=0.25,        # Seconds; Go1 swings are short. Longer swings earn feet_air_time.
+            knee_clearance=0.04,         # Metres; knees closer than this to the terrain count as a collision.
+            arrival_speed_limit=0.5,     # m/s; the guidance command is about 0.4 m/s at the arrival circle.
+            gap_deadband=0.03,           # Metres a foot may sit below the support within 4 cm before it counts.
+                                         # (v2 on pile scenes: at most 2.6 cm in successful episodes,
+                                         #  10-37 cm in the last second before 10 of 12 falls.)
+            gap_cap=0.10,                # Metres; a foot deeper in a gap than this counts the same.
+        ),
+    )
 
 
-def alive(s): return torch.ones_like(s.fall, dtype=torch.float32)
-def tracking_lin_vel(s): return torch.exp(-(s.lin_vel_body[:, :2] - s.command[:, :2]).square().sum(-1) / TRACKING_SIGMA)
-def tracking_ang_vel(s): return torch.exp(-(s.ang_vel_body[:, 2] - s.command[:, 2]).square() / TRACKING_SIGMA)
-def goal_progress(s): return torch.minimum((s.lin_vel_world[:, :2] * s.target_direction).sum(-1), s.max_speed) * s.moving
-def lin_vel_z(s): return s.lin_vel_body[:, 2].square()
-def ang_vel_xy(s): return s.ang_vel_body[:, :2].square().sum(-1)
-def orientation(s): return s.gravity_body[:, :2].square().sum(-1)
-def feet_air_time(s): return ((s.air_time_on_touchdown - AIR_TIME_TARGET) * s.touchdown).sum(-1) * s.moving
-def feet_slip(s): return (s.foot_velocity[:, :, :2].square().sum(-1) * s.contact).sum(-1)
-def knee_collision(s): return (s.knee_height < KNEE_CLEARANCE).float().sum(-1)
-def stand_still(s): return (s.joint_pos - s.home_joints).abs().sum(-1) * ~s.moving
-def torques(s): return s.torques.square().sum(-1)
-def dof_acc(s): return s.joint_acc.square().sum(-1)
-def action_rate(s): return (s.action - s.previous_action).square().sum(-1)
-def dof_pos_limits(s): return ((s.soft_low - s.joint_pos).clamp_min(0) + (s.joint_pos - s.soft_high).clamp_min(0)).sum(-1)
-def arrival(s): return s.newly_arrived.float()
-def fall(s): return s.fall.float()
-# Off by default (weight 0); see config.default_rewards.
-def arrival_speed(s): return (s.speed_xy - ARRIVAL_SPEED_LIMIT).clamp_min(0).square() * s.newly_arrived
-def feet_in_gap(s): return (s.foot_depth - GAP_DEADBAND).clamp(0, GAP_CAP - GAP_DEADBAND).sum(-1)
+EVENTS = ('arrival', 'fall', 'arrival_speed')   # paid once; every other term is paid per second
 
 
-DENSE = ('alive', 'tracking_lin_vel', 'tracking_ang_vel', 'goal_progress', 'lin_vel_z', 'ang_vel_xy', 'orientation',
-         'feet_air_time', 'feet_slip', 'knee_collision', 'stand_still', 'torques', 'dof_acc', 'action_rate',
-         'dof_pos_limits', 'feet_in_gap')
-EVENTS = ('arrival', 'fall', 'arrival_speed')
+# ------------------------------------------------------------------------------
+# Reward terms, one function per weight. s holds the step's quantities (built in
+# GoalEnv.step) and p the shaping parameters. Each returns one value per robot.
+# ------------------------------------------------------------------------------
+
+# 1. Reach the target.
+def _reward_alive(s, p):
+    """1 for every robot still running."""
+    return torch.ones_like(s.fall, dtype=torch.float32)
 
 
-def compute(s, weights, dt, only_positive=True):
-    """Total reward per robot and the weighted value of every term (for logging)."""
+def _reward_tracking_lin_vel(s, p):
+    """exp(-|v_xy - v_cmd|^2 / tracking_sigma): 1 when the body moves exactly as commanded."""
+    error = (s.lin_vel_body[:, :2] - s.command[:, :2]).square().sum(-1)
+    return torch.exp(-error / p['tracking_sigma'])
+
+
+def _reward_tracking_ang_vel(s, p):
+    """exp(-(w_z - w_cmd)^2 / tracking_sigma) for the turning rate."""
+    error = (s.ang_vel_body[:, 2] - s.command[:, 2]).square()
+    return torch.exp(-error / p['tracking_sigma'])
+
+
+def _reward_goal_progress(s, p):
+    """Velocity toward the target (m/s), at most the commanded speed; 0 while holding at a target."""
+    toward = (s.lin_vel_world[:, :2] * s.target_direction).sum(-1)
+    return torch.minimum(toward, s.max_speed) * s.moving
+
+
+def _reward_arrival(s, p):
+    """1 on the step a robot first comes within the arrival radius of its target."""
+    return s.newly_arrived.float()
+
+
+# 2. Keep the body controlled.
+def _reward_lin_vel_z(s, p):
+    """Vertical body speed squared."""
+    return s.lin_vel_body[:, 2].square()
+
+
+def _reward_ang_vel_xy(s, p):
+    """Roll and pitch rates squared."""
+    return s.ang_vel_body[:, :2].square().sum(-1)
+
+
+def _reward_orientation(s, p):
+    """Tilt: the horizontal part of gravity in the body frame, squared (0 when level)."""
+    return s.gravity_body[:, :2].square().sum(-1)
+
+
+# 3. Shape foot placement and gait.
+def _reward_feet_air_time(s, p):
+    """On touchdown, the swing time beyond air_time_target (negative for shorter swings)."""
+    return ((s.air_time_on_touchdown - p['air_time_target']) * s.touchdown).sum(-1) * s.moving
+
+
+def _reward_feet_slip(s, p):
+    """Horizontal foot speed squared, for feet in contact."""
+    return (s.foot_velocity[:, :, :2].square().sum(-1) * s.contact).sum(-1)
+
+
+def _reward_knee_collision(s, p):
+    """Number of knees closer than knee_clearance to the terrain."""
+    return (s.knee_height < p['knee_clearance']).float().sum(-1)
+
+
+def _reward_stand_still(s, p):
+    """Joint deviation from the standing pose, only while holding at a target."""
+    return (s.joint_pos - s.home_joints).abs().sum(-1) * ~s.moving
+
+
+# 4. Encourage smooth, efficient control.
+def _reward_torques(s, p):
+    """Motor torques squared."""
+    return s.torques.square().sum(-1)
+
+
+def _reward_dof_acc(s, p):
+    """Joint accelerations squared."""
+    return s.joint_acc.square().sum(-1)
+
+
+def _reward_action_rate(s, p):
+    """Change between consecutive actions, squared."""
+    return (s.action - s.previous_action).square().sum(-1)
+
+
+# 5. Discourage unsafe or failed behaviour.
+def _reward_dof_pos_limits(s, p):
+    """How far joints are beyond their soft limits (95% of the range)."""
+    return ((s.soft_low - s.joint_pos).clamp_min(0) + (s.joint_pos - s.soft_high).clamp_min(0)).sum(-1)
+
+
+def _reward_feet_in_gap(s, p):
+    """Metres each foot sits more than gap_deadband below the highest terrain within 4 cm (capped at gap_cap)."""
+    return (s.foot_depth - p['gap_deadband']).clamp(0, p['gap_cap'] - p['gap_deadband']).sum(-1)
+
+
+def _reward_fall(s, p):
+    """1 on the step a robot falls."""
+    return s.fall.float()
+
+
+def _reward_arrival_speed(s, p):
+    """On arrival, (horizontal speed - arrival_speed_limit)^2 above the limit."""
+    return (s.speed_xy - p['arrival_speed_limit']).clamp_min(0).square() * s.newly_arrived
+
+
+# ------------------------------------------------------------------------------
+# Total reward.
+# ------------------------------------------------------------------------------
+TERMS = {name[len('_reward_'):]: fn for name, fn in globals().items() if name.startswith('_reward_')}
+
+
+def compute(s, weights, params, dt, only_positive=False):
+    """Total reward per robot and the weighted value of every term (for logging).
+
+    Terms are added in the order of reward_config(); a term with weight 0 is skipped.
+    """
     terms = {}
-    for name in DENSE:
-        if weights.get(name, 0.):
-            terms[name] = torch.nan_to_num(globals()[name](s)) * weights[name] * dt
+    for name, weight in weights.items():
+        if weight and name not in EVENTS:
+            terms[name] = torch.nan_to_num(TERMS[name](s, params)) * weight * dt
     dense = sum(terms.values()) if terms else torch.zeros_like(s.fall, dtype=torch.float32)
     if only_positive:
         dense = dense.clamp_min(0.)
     for name in EVENTS:
         if weights.get(name, 0.):
-            terms[name] = globals()[name](s) * weights[name]
+            terms[name] = TERMS[name](s, params) * weights[name]
     return dense + sum(terms[name] for name in EVENTS if name in terms), terms

@@ -8,34 +8,17 @@ import json
 import math
 from pathlib import Path
 from .terrain_grid import TERRAIN_TYPES, ALL_TERRAIN_TYPES
+from .rewards import reward_config
 
 
 def default_rewards():
-    """Reward weights. Dense terms are multiplied by the control timestep;
-    'arrival' and 'fall' are one-off event rewards (not scaled by dt)."""
-    return dict(
-        alive=1.,                 # per second survived
-        # Task: move toward the target at the commanded velocity.
-        tracking_lin_vel=1.5,     # exp(-|v_xy - v_cmd|^2 / 0.25), body frame
-        tracking_ang_vel=.75,     # exp(-(w_z - w_cmd)^2 / 0.25)
-        goal_progress=.5,         # velocity component toward the target (m/s)
-        # Body stability.
-        lin_vel_z=-2.,            # vertical bouncing
-        ang_vel_xy=-.05,          # roll/pitch rates
-        orientation=-.5,          # tilt of the body
-        # Gait shaping.
-        feet_air_time=.5,         # reward swings longer than 0.25 s, paid on touchdown
-        feet_slip=-.1,            # horizontal foot speed while in contact
-        knee_collision=-1.,       # knees closer than 4 cm to the terrain
-        stand_still=-.5,          # joint deviation from home while holding at a goal
-        # Smooth, efficient control.
-        torques=-1e-4, dof_acc=-2.5e-7, action_rate=-.01, dof_pos_limits=-10.,
-        # Events.
-        arrival=10.,              # once per reached target
-        fall=-10.,                # once, on termination
-        # Failure-targeted terms, off unless a run config sets a weight (v3/v4 candidates):
-        arrival_speed=0.,         # once per arrival: (horizontal speed - 0.5 m/s)^2 above 0.5 m/s; -10 cancels the bonus at 1.5 m/s
-        feet_in_gap=0.)           # per second: metres each foot sits more than 3 cm below the support within 4 cm (capped at 10 cm)
+    """Reward weights; the defaults and what each one does are in rewards.reward_config()."""
+    return dict(reward_config()['scales'])
+
+
+def default_reward_params():
+    """Reward shaping parameters (tracking_sigma, gap_deadband, ...); see rewards.reward_config()."""
+    return dict(reward_config()['params'])
 
 
 @dataclass
@@ -79,7 +62,13 @@ class EnvConfig:
     yaw_gain: float = 1.5
     noise: float = 1.                # observation noise multiplier (0 disables)
     only_positive_rewards: bool = False  # optionally clip the dense reward at 0 (legged_gym); events added after
-    rewards: dict = field(default_factory=default_rewards)
+    rewards: dict = field(default_factory=default_rewards)               # weights, see rewards.reward_config()
+    reward_params: dict = field(default_factory=default_reward_params)   # shaping parameters, same place
+
+    def __post_init__(self):
+        # A run config lists only the weights and parameters it changes; the rest keep their defaults.
+        self.rewards = {**default_rewards(), **self.rewards}
+        self.reward_params = {**default_reward_params(), **self.reward_params}
 
     def validate(self):
         if self.backend not in ("native", "warp"): raise ValueError("backend must be native or warp")
@@ -100,6 +89,8 @@ class EnvConfig:
         if self.target_distance[0] <= self.arrival_radius: raise ValueError('Targets must start outside the arrival radius')
         if not all(math.isfinite(v) for v in self.rewards.values()): raise ValueError('Rewards must be finite')
         if unknown := set(self.rewards) - set(default_rewards()): raise ValueError(f'Unknown reward terms {unknown}')
+        if unknown := set(self.reward_params) - set(default_reward_params()):
+            raise ValueError(f'Unknown reward parameters {unknown}')
 
 
 @dataclass

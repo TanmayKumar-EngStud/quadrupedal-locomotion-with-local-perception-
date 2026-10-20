@@ -48,8 +48,11 @@ See the effect: `python scripts/preview_terrain.py --pile-pit-ramp` writes
 `outputs/terrain_preview.png` (3 m windows of every type at levels 0, 5, 9 and noise
 0, 0.5, 1.0).
 
-**Failure-targeted reward terms** (off by default, enabled in the v3 and v4 configs; a
-`rewards` block replaces the defaults entirely, so the configs list every weight):
+**Failure-targeted reward terms** (off by default, enabled in the v3 and v4 configs).
+All reward weights and shaping parameters, with one comment each, are in
+`reward_config()` at the top of `src/quadruped_nav/rl/rewards.py` (laid out like
+Lab 1 C). A run config lists only what it changes, under `env.rewards` (weights) and
+`env.reward_params` (e.g. `{"gap_deadband": 0.04}`); everything else keeps its default.
 
 | Term | What it penalises | Threshold | Suggested weight |
 | --- | --- | --- | --- |

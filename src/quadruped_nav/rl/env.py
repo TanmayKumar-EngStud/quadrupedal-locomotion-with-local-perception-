@@ -363,7 +363,7 @@ class GoalEnv:
             speed_xy=torch.linalg.vector_norm(k.lin_vel_world[:, :2], dim=-1),
             # How far each foot's sole sits below the highest terrain within 4 cm: positive when it slips into a gap.
             foot_depth=self.terrain.sample(k.feet[:, :, None, :2] + self.gap_scan).amax(-1) - (k.feet[:, :, 2] - FOOT_RADIUS))
-        reward, terms = reward_terms.compute(s, cfg.rewards, dt, cfg.only_positive_rewards)
+        reward, terms = reward_terms.compute(s, cfg.rewards, cfg.reward_params, dt, cfg.only_positive_rewards)
         self.previous_action = action.clone(); self.previous_feet = k.feet; self.previous_joint_vel = k.joint_vel
 
         # Observation of the state reached by this step (needed to bootstrap
