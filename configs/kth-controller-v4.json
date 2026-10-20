@@ -5,7 +5,14 @@
     "terrain_weights": [8, 8, 14, 10, 8, 15, 12, 25],
     "terrain_resolution": 0.05, "fine_terrain_resolution": 0.025, "terrain_levels": 10,
     "terrain_noise": 1.0, "terrain_variants": 2, "pile_pit_ramp": true,
-    "max_start_level": 2
+    "max_start_level": 2, "target_distance": [0.4, 3.0],
+    "rewards": {
+      "alive": 1.0, "tracking_lin_vel": 1.5, "tracking_ang_vel": 0.75, "goal_progress": 0.5,
+      "lin_vel_z": -2.0, "ang_vel_xy": -0.05, "orientation": -0.5, "feet_air_time": 0.5,
+      "feet_slip": -0.1, "knee_collision": -1.0, "stand_still": -0.5, "torques": -0.0001,
+      "dof_acc": -2.5e-07, "action_rate": -0.01, "dof_pos_limits": -10.0, "arrival": 10.0,
+      "fall": -10.0, "arrival_speed": -10.0, "feet_in_gap": -20.0
+    }
   },
   "updates": 100000, "max_hours": 8, "validation_seed": 100,
   "rollout_steps": 24, "epochs": 5, "minibatches": 4,
