@@ -6,4 +6,5 @@ nvidia-smi
 command -v uv >/dev/null || python3 -m pip install 'uv>=0.8,<1'
 uv sync --extra cloud --frozen
 uv run --extra cloud python scripts/cloud_preflight.py
-uv run --extra cloud quad-train --config configs/preflight.json
+# A fresh folder every time: training refuses to overwrite an existing checkpoint.
+uv run --extra cloud quad-train --config configs/preflight.json --output "runs/gpu-preflight-$(date +%Y%m%d-%H%M%S)"

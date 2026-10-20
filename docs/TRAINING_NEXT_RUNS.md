@@ -45,6 +45,19 @@ See the effect: `python scripts/preview_terrain.py --pile-pit-ramp` writes
 `outputs/terrain_preview.png` (3 m windows of every type at levels 0, 5, 9 and noise
 0, 0.5, 1.0).
 
+**Optional failure-targeted reward terms** (implemented, off by default; enable by
+adding them to `env.rewards` in both the v3 and the v4 config, together with all
+the default weights):
+
+| Term | What it penalises | Threshold | Suggested weight |
+| --- | --- | --- | --- |
+| `arrival_speed` | crossing the arrival circle fast: (speed - 0.5 m/s)^2, paid once per arrival | 0.5 m/s | -10 (cancels the +10 bonus at 1.5 m/s) |
+| `feet_in_gap` | each foot more than 3 cm below the highest terrain within 4 cm, in metres per second | 3 cm, capped at 10 cm | -20 |
+
+Evidence: in planner runs on pile scenes, v2 crossed arrival circles at 1.0-1.9 m/s
+(the command there is about 0.4 m/s), and in 10 of 12 falls a foot sat 10-37 cm deep
+in a gap during the last second, against at most 2.6 cm in successful episodes.
+
 **Not included yet** (team plan, RQ1): re-spaced difficulty levels (Amedeo), the edge
 and stumble penalties, the lower entropy bonus and the relaxed demotion rule
 (Damien). If any of them is added, v3 and v4 must both be trained with it, so that
@@ -56,16 +69,20 @@ Run these in a JupyterLab terminal on the GPU server, in the repository folder.
 
 ### 1. Get the code
 
-The server checkout may hold files that were uploaded by hand during development;
-`git stash` keeps those copies before updating.
+The server checkout holds files that were uploaded by hand during development,
+some of them untracked copies of files the branch now contains (for example
+`configs/kth-controller-v2.json`). Git refuses to pull over untracked files, and a
+plain `git stash` does not move them, so stash with `--include-untracked`. Ignored
+folders (`runs/`, `artifacts/`, `.venv/`) are not touched.
 
 ```sh
 cd "$HOME/RL&EAI/Project/Language-Guided-Quadrupedal-Navigation"   # or wherever the repository is
-git stash
+git stash push --include-untracked -m "server copies before v3"
 git fetch origin
 git checkout tanmay
 git pull origin tanmay
-git log --oneline -1                                               # should show the terrain-irregularity commit
+git log --oneline -3                                               # the newest commit must be on top
+ls configs/kth-controller-v3.json                                  # must exist
 ```
 
 On a fresh machine instead: `git clone -b tanmay https://github.com/TanmayKumar-EngStud/Language-Guided-Quadrupedal-Navigation.git`.
