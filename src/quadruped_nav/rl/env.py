@@ -106,6 +106,7 @@ class GoalEnv:
         self.body_scan = torch.tensor(BODY_SCAN, dtype=torch.float32, device=self.device)
         self.foot_scan = torch.tensor(FOOT_SCAN, dtype=torch.float32, device=self.device)
         self.clearance_scan = torch.tensor([[0, 0], [.1, 0], [-.1, 0], [0, .08], [0, -.08]], dtype=torch.float32, device=self.device)
+        self.gap_scan = torch.tensor([[0, 0], [.04, 0], [-.04, 0], [0, .04], [0, -.04]], dtype=torch.float32, device=self.device)
         self.speed_limits = torch.tensor([MAX_LINEAR_SPEED] * 3 + [MAX_BODY_RATE] * 3 + [MAX_JOINT_SPEED] * 12, device=self.device)
 
         # Per-robot task state.
@@ -358,7 +359,10 @@ class GoalEnv:
             foot_velocity=foot_velocity, contact=contact, knee_height=k.knee_height, joint_pos=k.joint_pos,
             home_joints=self.home_joints, torques=torch.nan_to_num(self.backend.tensor('qfrc_actuator')[:, 6:]),
             joint_acc=(k.joint_vel - self.previous_joint_vel) / dt, action=action, previous_action=self.previous_action,
-            soft_low=self.soft_low, soft_high=self.soft_high, newly_arrived=newly_arrived, fall=fall)
+            soft_low=self.soft_low, soft_high=self.soft_high, newly_arrived=newly_arrived, fall=fall,
+            speed_xy=torch.linalg.vector_norm(k.lin_vel_world[:, :2], dim=-1),
+            # How far each foot's sole sits below the highest terrain within 4 cm: positive when it slips into a gap.
+            foot_depth=self.terrain.sample(k.feet[:, :, None, :2] + self.gap_scan).amax(-1) - (k.feet[:, :, 2] - FOOT_RADIUS))
         reward, terms = reward_terms.compute(s, cfg.rewards, dt, cfg.only_positive_rewards)
         self.previous_action = action.clone(); self.previous_feet = k.feet; self.previous_joint_vel = k.joint_vel
 

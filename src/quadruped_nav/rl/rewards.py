@@ -21,6 +21,10 @@ import torch
 TRACKING_SIGMA = .25
 AIR_TIME_TARGET = .25        # seconds; Go1 swings are short
 KNEE_CLEARANCE = .04
+ARRIVAL_SPEED_LIMIT = .5     # m/s; the guidance command is about 0.4 m/s at the arrival circle
+# Metres a foot may sit below the support next to it before it counts. On v2's pile-scene runs feet sat
+# at most 2.6 cm below it in successful episodes, and 10-37 cm in the last second before 10 of 12 falls.
+GAP_DEADBAND, GAP_CAP = .03, .10
 
 
 def alive(s): return torch.ones_like(s.fall, dtype=torch.float32)
@@ -40,12 +44,15 @@ def action_rate(s): return (s.action - s.previous_action).square().sum(-1)
 def dof_pos_limits(s): return ((s.soft_low - s.joint_pos).clamp_min(0) + (s.joint_pos - s.soft_high).clamp_min(0)).sum(-1)
 def arrival(s): return s.newly_arrived.float()
 def fall(s): return s.fall.float()
+# Off by default (weight 0); see config.default_rewards.
+def arrival_speed(s): return (s.speed_xy - ARRIVAL_SPEED_LIMIT).clamp_min(0).square() * s.newly_arrived
+def feet_in_gap(s): return (s.foot_depth - GAP_DEADBAND).clamp(0, GAP_CAP - GAP_DEADBAND).sum(-1)
 
 
 DENSE = ('alive', 'tracking_lin_vel', 'tracking_ang_vel', 'goal_progress', 'lin_vel_z', 'ang_vel_xy', 'orientation',
          'feet_air_time', 'feet_slip', 'knee_collision', 'stand_still', 'torques', 'dof_acc', 'action_rate',
-         'dof_pos_limits')
-EVENTS = ('arrival', 'fall')
+         'dof_pos_limits', 'feet_in_gap')
+EVENTS = ('arrival', 'fall', 'arrival_speed')
 
 
 def compute(s, weights, dt, only_positive=True):

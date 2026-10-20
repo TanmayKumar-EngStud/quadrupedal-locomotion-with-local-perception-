@@ -185,6 +185,18 @@ def test_time_budget_stops_training_and_validation_tiles_are_unseen(tmp_path):
     assert len((tmp_path / 'run/evaluation.jsonl').read_text().splitlines()) == 1
 
 
+def test_arrival_speed_and_feet_in_gap_penalties():
+    state = SimpleNamespace(speed_xy=torch.tensor([.4, 1., 1.5, 1.5]), newly_arrived=torch.tensor([True, True, True, False]),
+                            foot_depth=torch.tensor([[0., .01, .05, .5]] * 4))
+    assert torch.allclose(rewards.arrival_speed(state), torch.tensor([0., .25, 1., 0.]))   # only on arrival, only above 0.5 m/s
+    assert torch.allclose(rewards.feet_in_gap(state), torch.full((4,), .02 + .07))          # 3 cm deadband, 10 cm cap
+    weights = {**default_rewards(), 'arrival_speed': -10., 'feet_in_gap': -20.}
+    env = GoalEnv(small_config(num_envs=2, terrain_types=['rough'], rewards=weights))
+    for _ in range(5):
+        _, _, _, _, info = env.step(torch.zeros(2, 12))
+    assert float(info['reward_terms']['feet_in_gap'].abs().max()) < 1e-6    # standing on level ground costs nothing
+
+
 def test_observation_contract_and_reward_bookkeeping():
     env = GoalEnv(small_config())
     obs, critic = env.observations(False)

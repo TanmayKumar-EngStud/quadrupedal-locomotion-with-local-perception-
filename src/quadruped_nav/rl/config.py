@@ -32,7 +32,10 @@ def default_rewards():
         torques=-1e-4, dof_acc=-2.5e-7, action_rate=-.01, dof_pos_limits=-10.,
         # Events.
         arrival=10.,              # once per reached target
-        fall=-10.)                # once, on termination
+        fall=-10.,                # once, on termination
+        # Failure-targeted terms, off unless a run config sets a weight (v3/v4 candidates):
+        arrival_speed=0.,         # once per arrival: (horizontal speed - 0.5 m/s)^2 above 0.5 m/s; -10 cancels the bonus at 1.5 m/s
+        feet_in_gap=0.)           # per second: metres each foot sits more than 3 cm below the support within 4 cm (capped at 10 cm)
 
 
 @dataclass
