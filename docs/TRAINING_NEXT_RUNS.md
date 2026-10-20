@@ -15,6 +15,9 @@ found so far: [GOAL_REACHING_V3.md](GOAL_REACHING_V3.md). Server setup in genera
 | `pile_pit_ramp` | true | true | pile pits deepen from 5 cm (level 0) to 0.5 m (level 5), for runs from scratch |
 | `terrain_weights` | 8/8/14/10/8/15/12/25 | same | share of robots per type (rough, slope, stairs up, stairs down, obstacles, stepping stones, gaps, piles) |
 | `max_start_level` | 2 | 2 | from scratch: robots start on levels 0-2 |
+| `target_distance` | 0.4-3 m | same | v1/v2 used 1-3 m, so the controller never practised short hops (planner hops are 0.25-2 m); targets pulled back inside the tile can be as close as 0.3 m, still outside the 0.25 m arrival circle |
+| `rewards.arrival_speed` | -10 | same | see below |
+| `rewards.feet_in_gap` | -20 | same | see below |
 
 | Setting (top level of the run config) | v3 and v4 | Meaning |
 | --- | --- | --- |
@@ -45,9 +48,8 @@ See the effect: `python scripts/preview_terrain.py --pile-pit-ramp` writes
 `outputs/terrain_preview.png` (3 m windows of every type at levels 0, 5, 9 and noise
 0, 0.5, 1.0).
 
-**Optional failure-targeted reward terms** (implemented, off by default; enable by
-adding them to `env.rewards` in both the v3 and the v4 config, together with all
-the default weights):
+**Failure-targeted reward terms** (off by default, enabled in the v3 and v4 configs; a
+`rewards` block replaces the defaults entirely, so the configs list every weight):
 
 | Term | What it penalises | Threshold | Suggested weight |
 | --- | --- | --- | --- |
@@ -57,6 +59,10 @@ the default weights):
 Evidence: in planner runs on pile scenes, v2 crossed arrival circles at 1.0-1.9 m/s
 (the command there is about 0.4 m/s), and in 10 of 12 falls a foot sat 10-37 cm deep
 in a gap during the last second, against at most 2.6 cm in successful episodes.
+v2 walking under the v3 rewards would lose about 3.0 per robot-second to
+arrival_speed (against 4.3 gained from arrivals) and 0.2 to feet_in_gap; a robot that
+follows its slowing command arrives at 0.5 m/s or less and pays nothing. In the probe
+run, check both terms in `reward_terms`: they should be small next to `arrival`.
 
 **Not included yet** (team plan, RQ1): re-spaced difficulty levels (Amedeo), the edge
 and stumble penalties, the lower entropy bonus and the relaxed demotion rule
