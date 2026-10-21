@@ -1,0 +1,246 @@
+{
+  "overall": {
+    "trials": 128,
+    "success_rate": 0.3046875,
+    "fall_rate": 0.0625,
+    "mean_time_to_goal_s": 2.8728201389312744,
+    "mean_progress_fraction": 0.4229470491409302,
+    "mean_final_distance_m": 1.1541060209274292
+  },
+  "by_type": {
+    "rough": {
+      "trials": 16,
+      "success_rate": 0.375,
+      "fall_rate": 0.0625,
+      "mean_time_to_goal_s": 2.4233319759368896,
+      "mean_progress_fraction": 0.4738798439502716,
+      "mean_final_distance_m": 1.052240252494812
+    },
+    "slope": {
+      "trials": 16,
+      "success_rate": 0.6875,
+      "fall_rate": 0.0,
+      "mean_time_to_goal_s": 2.9654541015625,
+      "mean_progress_fraction": 0.6251230835914612,
+      "mean_final_distance_m": 0.7497539520263672
+    },
+    "stairs_up": {
+      "trials": 16,
+      "success_rate": 0.125,
+      "fall_rate": 0.0625,
+      "mean_time_to_goal_s": 2.0499987602233887,
+      "mean_progress_fraction": 0.37518468499183655,
+      "mean_final_distance_m": 1.2496305704116821
+    },
+    "stairs_down": {
+      "trials": 16,
+      "success_rate": 0.4375,
+      "fall_rate": 0.0625,
+      "mean_time_to_goal_s": 2.554283857345581,
+      "mean_progress_fraction": 0.5040815472602844,
+      "mean_final_distance_m": 0.9918368458747864
+    },
+    "obstacles": {
+      "trials": 16,
+      "success_rate": 0.375,
+      "fall_rate": 0.0,
+      "mean_time_to_goal_s": 1.8299988508224487,
+      "mean_progress_fraction": 0.5897719860076904,
+      "mean_final_distance_m": 0.8204561471939087
+    },
+    "stepping_stones": {
+      "trials": 16,
+      "success_rate": 0.0,
+      "fall_rate": 0.125,
+      "mean_time_to_goal_s": null,
+      "mean_progress_fraction": 0.18332602083683014,
+      "mean_final_distance_m": 1.633347988128662
+    },
+    "gaps": {
+      "trials": 16,
+      "success_rate": 0.3125,
+      "fall_rate": 0.0,
+      "mean_time_to_goal_s": 3.4119975566864014,
+      "mean_progress_fraction": 0.4611908793449402,
+      "mean_final_distance_m": 1.0776185989379883
+    },
+    "piles": {
+      "trials": 16,
+      "success_rate": 0.125,
+      "fall_rate": 0.1875,
+      "mean_time_to_goal_s": 7.43001651763916,
+      "mean_progress_fraction": 0.17101818323135376,
+      "mean_final_distance_m": 1.657963752746582
+    }
+  },
+  "by_level": {
+    "0": {
+      "trials": 32,
+      "success_rate": 0.5625,
+      "fall_rate": 0.0,
+      "mean_time_to_goal_s": 2.6700007915496826,
+      "mean_progress_fraction": 0.6010143756866455,
+      "mean_final_distance_m": 0.797971248626709
+    },
+    "3": {
+      "trials": 32,
+      "success_rate": 0.28125,
+      "fall_rate": 0.0,
+      "mean_time_to_goal_s": 2.7155537605285645,
+      "mean_progress_fraction": 0.4230636656284332,
+      "mean_final_distance_m": 1.1538727283477783
+    },
+    "6": {
+      "trials": 32,
+      "success_rate": 0.1875,
+      "fall_rate": 0.09375,
+      "mean_time_to_goal_s": 2.386665105819702,
+      "mean_progress_fraction": 0.3667227625846863,
+      "mean_final_distance_m": 1.266554594039917
+    },
+    "9": {
+      "trials": 32,
+      "success_rate": 0.1875,
+      "fall_rate": 0.15625,
+      "mean_time_to_goal_s": 4.203332901000977,
+      "mean_progress_fraction": 0.3009873926639557,
+      "mean_final_distance_m": 1.3980255126953125
+    }
+  },
+  "success_by_type_level": {
+    "rough/0": 0.5,
+    "rough/3": 0.0,
+    "rough/6": 0.5,
+    "rough/9": 0.5,
+    "slope/0": 0.75,
+    "slope/3": 0.75,
+    "slope/6": 0.75,
+    "slope/9": 0.5,
+    "stairs_up/0": 0.25,
+    "stairs_up/3": 0.25,
+    "stairs_up/6": 0.0,
+    "stairs_up/9": 0.0,
+    "stairs_down/0": 1.0,
+    "stairs_down/3": 0.5,
+    "stairs_down/6": 0.0,
+    "stairs_down/9": 0.25,
+    "obstacles/0": 0.75,
+    "obstacles/3": 0.25,
+    "obstacles/6": 0.25,
+    "obstacles/9": 0.25,
+    "stepping_stones/0": 0.0,
+    "stepping_stones/3": 0.0,
+    "stepping_stones/6": 0.0,
+    "stepping_stones/9": 0.0,
+    "gaps/0": 0.75,
+    "gaps/3": 0.5,
+    "gaps/6": 0.0,
+    "gaps/9": 0.0,
+    "piles/0": 0.5,
+    "piles/3": 0.0,
+    "piles/6": 0.0,
+    "piles/9": 0.0
+  },
+  "distance_m": 2.0,
+  "seconds": 10.0,
+  "speed": 0.8,
+  "backend": "native",
+  "levels": [
+    0,
+    3,
+    6,
+    9
+  ],
+  "trials_per_cell": 4,
+  "checkpoint": "artifacts/variant_8-feet49-relaxed/controller.pt",
+  "checkpoint_update": 959,
+  "config": {
+    "num_envs": 4096,
+    "backend": "native",
+    "device": "cpu",
+    "seed": 0,
+    "terrain_types": [
+      "rough",
+      "slope",
+      "stairs_up",
+      "stairs_down",
+      "obstacles",
+      "stepping_stones",
+      "gaps",
+      "piles"
+    ],
+    "terrain_levels": 10,
+    "tile_size": 8.0,
+    "terrain_resolution": 0.05,
+    "fine_terrain_resolution": 0.025,
+    "terrain_weights": null,
+    "terrain_noise": 0.0,
+    "terrain_noise_ramp": 0,
+    "terrain_variants": 2,
+    "pile_pit_ramp": false,
+    "curriculum": true,
+    "curriculum_rule": "relaxed",
+    "max_start_level": 2,
+    "sim_dt": 0.004,
+    "control_dt": 0.02,
+    "solver_iterations": 20,
+    "solver_ls_iterations": 20,
+    "contact_set": "feet_trunk",
+    "nconmax": 64,
+    "njmax": 256,
+    "kp": 35.0,
+    "joint_damping": 0.5,
+    "action_scale": 0.25,
+    "action_clip": 4.0,
+    "episode_seconds": 20.0,
+    "target_distance": [
+      0.4,
+      3.0
+    ],
+    "max_speed": [
+      0.5,
+      1.0
+    ],
+    "arrival_radius": 0.25,
+    "hold_seconds": [
+      0.0,
+      2.0
+    ],
+    "slow_down_radius": 0.5,
+    "yaw_gain": 1.5,
+    "noise": 1.0,
+    "scan_layout": "feet49",
+    "only_positive_rewards": false,
+    "rewards": {
+      "alive": 1.0,
+      "tracking_lin_vel": 1.5,
+      "tracking_ang_vel": 0.75,
+      "goal_progress": 0.5,
+      "arrival": 10.0,
+      "lin_vel_z": -2.0,
+      "ang_vel_xy": -0.05,
+      "orientation": -0.5,
+      "feet_air_time": 0.5,
+      "feet_slip": -0.1,
+      "knee_collision": -1.0,
+      "stand_still": -0.5,
+      "torques": -0.0001,
+      "dof_acc": -2.5e-07,
+      "action_rate": -0.01,
+      "dof_pos_limits": -10.0,
+      "feet_in_gap": 0.0,
+      "feet_edge": 0.0,
+      "fall": -10.0,
+      "arrival_speed": 0.0
+    },
+    "reward_params": {
+      "tracking_sigma": 0.25,
+      "air_time_target": 0.25,
+      "knee_clearance": 0.04,
+      "arrival_speed_limit": 0.5,
+      "gap_deadband": 0.03,
+      "gap_cap": 0.1,
+      "edge_drop": 0.05
+    }
+  }
+}
