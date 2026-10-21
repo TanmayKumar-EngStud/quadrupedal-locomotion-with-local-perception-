@@ -22,6 +22,7 @@ the earlier controller only learned to stand still.
 
 - [Runbook](docs/RUNBOOK.md): setup, training, plots, export and local execution commands.
 - [Next training runs](docs/TRAINING_NEXT_RUNS.md): step-by-step guide for the v3/v4 runs of RQ1.
+- [Viewer commands](docs/VIEWER_COMMANDS.md): watch.py and play.py commands for every terrain, family and controller.
 - [Implementation status](docs/IMPLEMENTATION_STATUS.md): tested scope and research limitations.
 
 ```sh

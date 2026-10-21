@@ -3,9 +3,14 @@
     python watch.py --terrain stairs_up --level 5
     python watch.py --checkpoint artifacts/controller_v1/controller.pt --terrain stepping_stones --level 0
     python watch.py --checkpoint artifacts/controller_v2/controller.pt --terrain piles --level 3
+    python watch.py --checkpoint artifacts/controller_v3/controller.pt --terrain piles --level 3 --terrain-noise 0
+
+--terrain-noise sets the irregularities (0 = regular terrain, 0.5 = v3's training
+terrain, 1.0 = v4's); --pile-pits deep or ramp sets the pile pits. Both default to
+what the controller was trained on.
 
 The robot starts on the chosen tile and walks to a chain of random targets
-1-3 m away, shown as a red sphere. After a fall it restarts on the same tile.
+(the distances it was trained on), shown as a red sphere. After a fall it restarts on the same tile.
 Close the window to stop. --headless runs without a window and prints
 the same events, for a quick check on any machine.
 """
@@ -22,13 +27,15 @@ from .rl.policy import load_controller
 from .rl.terrain_grid import ALL_TERRAIN_TYPES
 
 
-def build(checkpoint, terrain, level, speed, seed):
+def build(checkpoint, terrain, level, speed, seed, terrain_noise=None, pile_pits=None):
     policy, saved = load_controller(checkpoint)
     # Only the chosen terrain type is built (10 tiles instead of 70): drawing every
     # 8 m heightfield, about 51k triangles each, is what made the viewer lag.
     cfg = replace(EnvConfig(**saved['config']['env']), num_envs=1, backend='native', device='cpu', noise=0.,
                   curriculum=False, seed=seed, episode_seconds=1e9, max_speed=[speed, speed], terrain_types=[terrain],
                   terrain_weights=None, terrain_variants=1)
+    if terrain_noise is not None: cfg = replace(cfg, terrain_noise=terrain_noise)
+    if pile_pits is not None: cfg = replace(cfg, pile_pit_ramp=pile_pits == 'ramp')
     env = GoalEnv(cfg)
     env.column[0], env.level[0] = 0, level
     env.reset(torch.tensor([0]))
@@ -60,11 +67,14 @@ def main():
     p.add_argument('--speed', type=float, default=.8, help='commanded walking speed in m/s')
     p.add_argument('--seed', type=int, default=0, help='changes the start pose and the targets')
     p.add_argument('--seconds', type=float, default=0., help='stop after this long (0 = until the window is closed)')
+    p.add_argument('--terrain-noise', type=float, help='irregularities: 0 regular, 0.5 as v3, 1.0 as v4 (default: as trained)')
+    p.add_argument('--pile-pits', choices=['deep', 'ramp'], help='pile pits: 0.5 m everywhere, or deepening with level (default: as trained)')
     p.add_argument('--headless', action='store_true', help='no window; print events only')
     a = p.parse_args()
     torch.set_num_threads(2)
-    policy, env, saved = build(a.checkpoint, a.terrain, a.level, a.speed, a.seed)
-    print(f'Controller update {saved["update"]}, {a.terrain} level {a.level}, target speed {a.speed} m/s', flush=True)
+    policy, env, saved = build(a.checkpoint, a.terrain, a.level, a.speed, a.seed, a.terrain_noise, a.pile_pits)
+    print(f'Controller update {saved["update"]}, {a.terrain} level {a.level}, target speed {a.speed} m/s, '
+          f'terrain noise {env.cfg.terrain_noise:g}, pile pits {"ramp" if env.cfg.pile_pit_ramp else "deep"}', flush=True)
     dt, limit = env.cfg.control_dt, a.seconds or float('inf')
     handle = None
     if not a.headless:
