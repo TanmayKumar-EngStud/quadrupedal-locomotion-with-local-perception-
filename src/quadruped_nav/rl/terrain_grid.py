@@ -391,6 +391,8 @@ class TerrainGrid:
     and their heightfields keep the coarse cells (see tiles()).
 
     noise scales the per-element irregularities (0 = the regular v1/v2 terrain).
+    With noise_ramp = L > 0 the irregularities grow with difficulty instead: from 0
+    on level 0 to the full noise on level L and above (see level_noise).
     variants builds that many independent tiles per (level, type), so a noisy run
     sees more than one draw of each; columns are ordered type-major
     (column = type index x variants + variant). Variant 0 with noise 0 is exactly
@@ -406,10 +408,12 @@ class TerrainGrid:
     noise: float = 0.
     variants: int = 1
     pile_pit_ramp: bool = False
+    noise_ramp: int = 0
 
     def __post_init__(self):
         self.types = tuple(self.types)
-        if self.noise < 0 or self.variants < 1: raise ValueError('noise must be >= 0 and variants >= 1')
+        if self.noise < 0 or self.noise_ramp < 0 or self.variants < 1:
+            raise ValueError('noise and noise_ramp must be >= 0 and variants >= 1')
         for kind in self.types: make_tile(kind, 0., np.random.default_rng(0), 9, self.resolution)
         rng = np.random.default_rng(self.seed)
         own = {kind: np.random.default_rng([self.seed, ALL_TERRAIN_TYPES.index(kind)]) for kind in EXTRA_TERRAIN_TYPES}
@@ -430,8 +434,9 @@ class TerrainGrid:
                 index = ALL_TERRAIN_TYPES.index(kind)
                 # Variant 0 keeps the v1/v2 random streams; the others and the noise use their own.
                 shape_rng = own.get(kind, rng) if variant == 0 else np.random.default_rng([self.seed, index, level, variant])
-                noise_rng = np.random.default_rng([self.seed, 7, index, level, variant]) if self.noise else None
-                options = dict(noise=self.noise, nrng=noise_rng, pile_pit_ramp=self.pile_pit_ramp)
+                noise = self.level_noise(level)
+                noise_rng = np.random.default_rng([self.seed, 7, index, level, variant]) if noise else None
+                options = dict(noise=noise, nrng=noise_rng, pile_pit_ramp=self.pile_pit_ramp)
                 if kind in FINE_TYPES:
                     fine = make_tile(kind, d, shape_rng, n * f, self.resolution / f, **options)
                     fine_tiles[level, column] = fine
@@ -451,6 +456,10 @@ class TerrainGrid:
         # Tile (level, column) spans x in [x0, x0 + tile_size], y in [y0, y0 + tile_size].
         self.origin_x = self.border + np.arange(self.levels) * self.tile_size
         self.origin_y = self.border + np.arange(len(self.columns)) * self.tile_size
+
+    def level_noise(self, level):
+        """Irregularity scale of a level's tiles: noise on every level, or noise x min(1, level / noise_ramp)."""
+        return self.noise * min(1., level / self.noise_ramp) if self.noise_ramp else self.noise
 
     @property
     def size_x(self): return (self.heights.shape[1] - 1) * self.height_resolution

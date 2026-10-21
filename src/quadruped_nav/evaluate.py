@@ -15,6 +15,7 @@ from .rl.env import GoalEnv,yaw_of
 from .rl.policy import load_controller
 from .terrain import TERRAINS,generate_terrain
 from .scene import load_scene
+from .markers import describe_scan,draw_scan
 
 
 def make_planner(name,terrain,limits,checkpoint=None):
@@ -43,8 +44,10 @@ def draw_subgoals(scene,current,visited,radius):
         add(mujoco.mjtGeom.mjGEOM_SPHERE,[.06,0,0],[x,y,z+.06],[.95,.2,.15,1])
 
 
-def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planner_checkpoint=None,viewer=False,ground='boxes',on_step=None):
-    """One planner episode in native MuJoCo. on_step(env), if given, is called after every control step (e.g. to render)."""
+def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planner_checkpoint=None,viewer=False,ground='boxes',on_step=None,show_scan=True):
+    """One planner episode in native MuJoCo. on_step(env), if given, is called after every control step (e.g. to render).
+
+    With the viewer, show_scan draws the terrain samples the controller senses (see markers.py)."""
     torch.set_num_threads(2);torch.manual_seed(seed)
     policy,saved=load_controller(checkpoint)
     cfg=replace(EnvConfig(**saved['config']['env']),num_envs=1,backend='native',device='cpu',seed=seed,noise=0.,episode_seconds=seconds)
@@ -57,6 +60,7 @@ def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planne
         import mujoco.viewer
         handle=mujoco.viewer.launch_passive(env.model,env.backend.data[0])
         handle.cam.lookat[:]=[3,0,0];handle.cam.distance=12;handle.cam.azimuth=130;handle.cam.elevation=-50
+        print(describe_scan(env),flush=True)
     try:
         for step in range(math.ceil(seconds/cfg.control_dt)):
             started=time.monotonic();q=env.backend.tensor('qpos')[0].clone();yaw=float(yaw_of(q[None,3:7])[0])
@@ -90,7 +94,9 @@ def evaluate(checkpoint,scene,planner_name='optimistic',seconds=60,seed=0,planne
             if on_step:on_step(env)
             if handle:
                 if not handle.is_running():status='viewer_closed';break
-                with handle.lock():draw_subgoals(handle.user_scn,previous_xyz,visited,cfg.arrival_radius)
+                with handle.lock():
+                    draw_subgoals(handle.user_scn,previous_xyz,visited,cfg.arrival_radius)
+                    if show_scan:draw_scan(handle.user_scn,env)
                 handle.sync();time.sleep(max(0,cfg.control_dt-(time.monotonic()-started)))
             if bool(info['fall'][0]):status='fall';break
             if bool(done[0]):break
@@ -107,10 +113,11 @@ def main():
     p.add_argument('--planner-checkpoint');p.add_argument('--family',choices=TERRAINS,default='open');p.add_argument('--row',type=int,default=0)
     p.add_argument('--seed',type=int,default=10000);p.add_argument('--scene');p.add_argument('--seconds',type=float,default=60);p.add_argument('--viewer',action='store_true')
     p.add_argument('--ground',choices=['boxes','heightfield'],default='boxes',help='scene supports as boxes, or as the heightfield the controller senses')
+    p.add_argument('--no-scan',action='store_true',help='viewer: hide the terrain samples the controller senses')
     p.add_argument('--output',default='outputs/evaluation/episode.json');a=p.parse_args()
     if a.seconds<=0:p.error('Duration must be positive')
     scene=load_scene(a.scene) if a.scene else generate_terrain(a.family,a.row,a.seed)
-    result=evaluate(a.checkpoint,scene,a.planner,a.seconds,a.seed,a.planner_checkpoint,a.viewer,a.ground)
+    result=evaluate(a.checkpoint,scene,a.planner,a.seconds,a.seed,a.planner_checkpoint,a.viewer,a.ground,show_scan=not a.no_scan)
     path=Path(a.output);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps({k:result[k] for k in ['planner','status','time_s','distance_m']}));print(path)
 

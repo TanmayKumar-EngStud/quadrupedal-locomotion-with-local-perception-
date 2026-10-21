@@ -35,6 +35,10 @@ done
 
 The sections below describe the settings and the from-scratch v3 run.
 
+**Later on October 21:** the team chose eight 2-hour variants on top of v2 instead (four
+per GPU). They are described, with launch and evaluation steps, in
+[TRAINING_VARIANTS.md](TRAINING_VARIANTS.md).
+
 ## What is implemented
 
 | Setting (in `env` of the run config) | v3 | v4 | Meaning |

@@ -57,7 +57,7 @@ def tile_rollout(checkpoint, recorder, terrain, level, seconds, seed, noise=None
     policy, saved = load_controller(checkpoint)
     cfg = replace(EnvConfig(**saved['config']['env']), num_envs=1, backend='native', device='cpu', noise=0., curriculum=False,
                   seed=seed, episode_seconds=seconds + 1, max_speed=[.75, .75], terrain_types=[terrain], terrain_weights=None,
-                  terrain_variants=1, pile_pit_ramp=False, terrain_noise=noise or 0.)   # same terrain for both controllers
+                  terrain_variants=1, pile_pit_ramp=False, terrain_noise=noise or 0., terrain_noise_ramp=0)   # same terrain for both controllers
     env = GoalEnv(cfg)
     env.column[0], env.level[0] = 0, level
     env.reset(torch.tensor([0]))

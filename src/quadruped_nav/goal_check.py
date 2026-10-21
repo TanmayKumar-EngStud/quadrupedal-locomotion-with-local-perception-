@@ -25,7 +25,7 @@ from .rl.evaluation import TerrainEvaluator
 from .rl.policy import load_controller
 
 TERRAIN_FIELDS = ('terrain_types', 'terrain_levels', 'tile_size', 'terrain_resolution', 'fine_terrain_resolution',
-                  'terrain_noise', 'terrain_variants', 'pile_pit_ramp')
+                  'terrain_noise', 'terrain_noise_ramp', 'terrain_variants', 'pile_pit_ramp')
 
 
 def main():
@@ -35,7 +35,7 @@ def main():
     parser.add_argument('--trials', type=int, default=4)
     parser.add_argument('--terrain-types', nargs='+', help='terrain types to test (default: the checkpoint\'s)')
     parser.add_argument('--terrain-from', help='take the terrain settings from this run config')
-    parser.add_argument('--terrain-noise', type=float, help='irregularity scale of the test tiles (0 = regular)')
+    parser.add_argument('--terrain-noise', type=float, help='irregularity scale of the test tiles, the same on every level (0 = regular)')
     parser.add_argument('--seed', type=int, default=12345, help='seed of the test tiles, robots and targets')
     parser.add_argument('--output', default='outputs/evaluation/terrain_goals.json')
     a = parser.parse_args()
@@ -49,7 +49,7 @@ def main():
     if a.terrain_types:
         cfg = replace(cfg, terrain_types=a.terrain_types, terrain_weights=None)
     if a.terrain_noise is not None:
-        cfg = replace(cfg, terrain_noise=a.terrain_noise)
+        cfg = replace(cfg, terrain_noise=a.terrain_noise, terrain_noise_ramp=0)
     result = TerrainEvaluator(cfg, trials=a.trials, seed=a.seed).run(policy)
     result.update(checkpoint=a.checkpoint, checkpoint_update=saved['update'], config=asdict(cfg))
     path = Path(a.output); path.parent.mkdir(parents=True, exist_ok=True)
