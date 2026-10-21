@@ -63,6 +63,7 @@ def reward_config():
             # 5. Discourage unsafe or failed behaviour.
             dof_pos_limits=-10.0,    # Penalise joints beyond 95% of their range.
             feet_in_gap=0.0,         # Penalise feet sitting in gaps (see gap_deadband). Off here; -20 in v3/v4.
+            feet_edge=0.0,           # Penalise feet standing within 5 cm of a drop deeper than edge_drop. Off here; -1 in variants 3 and 6.
             fall=-10.0,              # EVENT: once, when the robot falls (the episode ends).
             arrival_speed=0.0,       # EVENT: penalise arriving faster than arrival_speed_limit. Off here; -10 in v3/v4.
         ),
@@ -76,6 +77,7 @@ def reward_config():
                                          # (v2 on pile scenes: at most 2.6 cm in successful episodes,
                                          #  10-37 cm in the last second before 10 of 12 falls.)
             gap_cap=0.10,                # Metres; a foot deeper in a gap than this counts the same.
+            edge_drop=0.05,              # Metres; a drop this deep within 5 cm of a standing foot makes it an edge.
         ),
     )
 
@@ -179,6 +181,12 @@ def _reward_dof_pos_limits(s, p):
 def _reward_feet_in_gap(s, p):
     """Metres each foot sits more than gap_deadband below the highest terrain within 4 cm (capped at gap_cap)."""
     return (s.foot_depth - p['gap_deadband']).clamp(0, p['gap_cap'] - p['gap_deadband']).sum(-1)
+
+
+def _reward_feet_edge(s, p):
+    """Number of feet standing at an edge: the terrain within 5 cm drops more than edge_drop below the sole
+    (the feet_edge term of Cheng et al., Extreme Parkour, 2023). Catches feet before they slip off a pile or stone."""
+    return (s.edge_drop > p['edge_drop']).float().sum(-1)
 
 
 def _reward_fall(s, p):

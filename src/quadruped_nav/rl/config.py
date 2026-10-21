@@ -36,9 +36,11 @@ class EnvConfig:
     fine_terrain_resolution: float = .025   # cell size of the pile tiles (terrain_grid.FINE_TYPES)
     terrain_weights: list = None     # share of robots per terrain type (None: equal shares)
     terrain_noise: float = 0.        # per-element irregularities: 0.5 for v3, 1.0 for v4 (see terrain_grid)
+    terrain_noise_ramp: int = 0      # 0: terrain_noise on every level; L > 0: noise grows from 0 on level 0 to terrain_noise on level L
     terrain_variants: int = 1        # independent tiles per (level, type); robots draw one at every reset
     pile_pit_ramp: bool = False      # pile pits deepen with level (for runs that start from scratch)
     curriculum: bool = True          # per-robot level promotion / demotion
+    curriculum_rule: str = 'strict'  # 'strict' (v1, v2) or 'relaxed' (Zhang-style demotion); see GoalEnv._update_levels
     max_start_level: int = 2         # robots start on rows 0..max_start_level
     # Physics and control.
     sim_dt: float = .004
@@ -61,6 +63,7 @@ class EnvConfig:
     slow_down_radius: float = .5     # commanded speed ramps down inside this distance
     yaw_gain: float = 1.5
     noise: float = 1.                # observation noise multiplier (0 disables)
+    scan_layout: str = 'v1'          # terrain samples the policy senses: 'v1' or 'feet49' (see SCAN_LAYOUTS below)
     only_positive_rewards: bool = False  # optionally clip the dense reward at 0 (legged_gym); events added after
     rewards: dict = field(default_factory=default_rewards)               # weights, see rewards.reward_config()
     reward_params: dict = field(default_factory=default_reward_params)   # shaping parameters, same place
@@ -83,7 +86,10 @@ class EnvConfig:
         if self.terrain_weights is not None and (len(self.terrain_weights) != len(self.terrain_types)
                                                  or min(self.terrain_weights) < 0 or sum(self.terrain_weights) <= 0):
             raise ValueError('terrain_weights needs one non-negative weight per terrain type')
-        if self.terrain_noise < 0 or self.terrain_variants < 1: raise ValueError('Invalid terrain noise or variants')
+        if self.terrain_noise < 0 or self.terrain_noise_ramp < 0 or self.terrain_variants < 1:
+            raise ValueError('Invalid terrain noise, noise ramp or variants')
+        if self.curriculum_rule not in ('strict', 'relaxed'): raise ValueError('curriculum_rule must be strict or relaxed')
+        if self.scan_layout not in SCAN_LAYOUTS: raise ValueError(f'scan_layout must be one of {list(SCAN_LAYOUTS)}')
         if not 0 <= self.max_start_level < self.terrain_levels: raise ValueError('Invalid start level')
         if not 0 < self.target_distance[0] <= self.target_distance[1]: raise ValueError('Invalid target distance range')
         if self.target_distance[0] <= self.arrival_radius: raise ValueError('Targets must start outside the arrival radius')
@@ -130,26 +136,56 @@ class TrainConfig:
 
 # Terrain samples used by the policy (Lab 1 style): body-anchored points plus
 # points anchored at every foot, all in the yaw-aligned body frame (x forward,
-# y left). At most 200 samples in total.
+# y left). At most 200 samples in total. Feet in the order FR, FL, RR, RL; in the
+# standing pose they sit at x = +-0.188 m, y = +-0.127 m from the base.
+#
+# 'v1' (controllers v1-v3): a 10 x 7 body grid every 15 cm, reaching 0.9 m ahead,
+# and the same 9 points at every foot (106 samples).
 BODY_SCAN = [(x / 100, y / 100) for x in range(-45, 91, 15) for y in range(-45, 46, 15)]
 FOOT_SCAN = [(0., 0.), (.08, 0.), (-.08, 0.), (0., .08), (0., -.08), (.16, 0.), (.24, 0.), (.16, .08), (.16, -.08)]
 
+# 'feet49' (training variants of October 21): a 7 x 7 grid in a 0.5 m square at
+# every foot (points 7.1 cm apart), turned away from the body: front feet look
+# ahead, rear feet behind, left feet left, right feet right. Each foot sits on the
+# second point from the square's inner corner (one point on the body side, five
+# outside), so in the standing pose the squares do not overlap (16 cm apart
+# lengthwise, 4 cm sideways) and together cover 1.16 m x 1.04 m. Four points on
+# the trunk's centre line fill the gap between them (200 samples).
+LEG_SQUARE_SIDE, LEG_SQUARE_POINTS = .5, 7
 
-def observation_spec():
-    """Names and sizes of the actor and critic observation blocks (frozen contract)."""
+
+def _leg_square(sx, sy):
+    pitch = LEG_SQUARE_SIDE / LEG_SQUARE_POINTS
+    steps = [(i - 1) * pitch for i in range(LEG_SQUARE_POINTS)]   # from one point inside to five outside
+    return [(round(sx * a, 6), round(sy * b, 6)) for a in steps for b in steps]
+
+
+FEET49_BODY_SCAN = [(-.15, 0.), (-.05, 0.), (.05, 0.), (.15, 0.)]
+FEET49_FOOT_SCAN = [_leg_square(sx, sy) for sx, sy in ((1, -1), (1, 1), (-1, -1), (-1, 1))]
+
+# layout: (body points, one list of points per foot)
+SCAN_LAYOUTS = {'v1': (BODY_SCAN, [FOOT_SCAN] * 4), 'feet49': (FEET49_BODY_SCAN, FEET49_FOOT_SCAN)}
+
+
+def observation_spec(layout='v1'):
+    """Names and sizes of the actor and critic observation blocks (frozen contract per scan layout)."""
+    body, feet = SCAN_LAYOUTS[layout]
     actor = [["base_linear_velocity_body_x2", 3], ["base_angular_velocity_body_x0.25", 3],
              ["projected_gravity", 3], ["velocity_command_vx_vy_wz", 3],
              ["target_xy_body_clipped_3m", 2], ["target_distance_clipped_3m", 1],
              ["joint_position_minus_home", 12], ["joint_velocity_x0.05", 12], ["previous_action", 12],
              ["foot_contact", 4],
-             ["body_scan_base_height_minus_0.3_minus_terrain", len(BODY_SCAN)],
-             ["foot_scan_foot_height_minus_terrain", 4 * len(FOOT_SCAN)]]
+             ["body_scan_base_height_minus_0.3_minus_terrain", len(body)],
+             ["foot_scan_foot_height_minus_terrain", sum(len(points) for points in feet)]]
     critic_extra = [["base_height_above_terrain", 1], ["foot_height_above_terrain", 4], ["target_time_left_s", 1]]
     actor_dim = sum(n for _, n in actor)
-    return {"version": 3, "actor_fields": actor, "critic_extra_fields": critic_extra,
+    spec = {"version": 3, "actor_fields": actor, "critic_extra_fields": critic_extra,
             "actor_dim": actor_dim, "critic_dim": actor_dim + sum(n for _, n in critic_extra),
-            "body_scan": BODY_SCAN, "foot_scan": FOOT_SCAN, "foot_order": ["FR", "FL", "RR", "RL"],
+            "body_scan": body, "foot_scan": FOOT_SCAN, "foot_order": ["FR", "FL", "RR", "RL"],
             "joint_order": [f"{leg}_{joint}" for leg in ["FR", "FL", "RR", "RL"] for joint in ["hip", "thigh", "calf"]]}
+    if layout != 'v1':   # v1 keeps the exact contract of the v1-v3 checkpoints
+        spec.update(version=4, scan_layout=layout, foot_scan=feet)
+    return spec
 
 
 OBSERVATION_SPEC = observation_spec()

@@ -23,7 +23,7 @@ import mujoco
 import numpy as np
 import torch
 from .backend import NativeBackend, WarpBackend
-from .config import EnvConfig, OBSERVATION_SPEC, BODY_SCAN, FOOT_SCAN
+from .config import EnvConfig, observation_spec, SCAN_LAYOUTS
 from .robot import FEET, CALVES, build_training_model, configure_physics
 from .terrain_grid import HeightGrid, TerrainGrid
 from . import rewards as reward_terms
@@ -33,6 +33,10 @@ FOOT_RADIUS = .023
 STANDING_HEIGHT = .30         # nominal base height above terrain, used to scale the body scan
 FALL_CLEARANCE = .12          # base closer than this to the highest terrain within 10 cm = collapsed
 FALL_TILT = -.5               # projected gravity z above this (tilt > 60 degrees) = fallen
+EDGE_RADIUS = .05             # a supported foot with a drop within this distance stands at an edge (feet_edge)
+# curriculum_rule 'relaxed': promote after reaching this share of the attempted targets;
+# demote only when no target was reached and less than this share of the distance to any target was closed.
+RELAXED_PROMOTE, RELAXED_DEMOTE_PROGRESS = .6, .25
 # Physically impossible speeds (m/s, rad/s, rad/s): the simulation of that robot
 # failed, so its episode is ended and the values are clamped before use.
 MAX_LINEAR_SPEED, MAX_BODY_RATE, MAX_JOINT_SPEED = 20., 60., 100.
@@ -52,8 +56,8 @@ def inverse_rotate(q, v):
 def yaw_frame_points(xy, yaw, offsets):
     """World xy of offsets (k, 2) given in the yaw-aligned frame at positions xy[..., 2]."""
     c, s = torch.cos(yaw)[..., None], torch.sin(yaw)[..., None]
-    x = xy[..., None, 0] + c * offsets[:, 0] - s * offsets[:, 1]
-    y = xy[..., None, 1] + s * offsets[:, 0] + c * offsets[:, 1]
+    x = xy[..., None, 0] + c * offsets[..., 0] - s * offsets[..., 1]
+    y = xy[..., None, 1] + s * offsets[..., 0] + c * offsets[..., 1]
     return torch.stack([x, y], -1)
 
 
@@ -76,7 +80,8 @@ class GoalEnv:
             self.grid = grid or TerrainGrid(cfg.terrain_types, cfg.terrain_levels, cfg.tile_size,
                                             cfg.terrain_resolution, seed=cfg.seed,
                                             fine_resolution=cfg.fine_terrain_resolution, noise=cfg.terrain_noise,
-                                            variants=cfg.terrain_variants, pile_pit_ramp=cfg.pile_pit_ramp)
+                                            variants=cfg.terrain_variants, pile_pit_ramp=cfg.pile_pit_ramp,
+                                            noise_ramp=cfg.terrain_noise_ramp)
             self.model = build_training_model(self.grid)
             self.terrain = self.grid.height_grid(self.device)
         else:
@@ -103,10 +108,15 @@ class GoalEnv:
         self.soft_low, self.soft_high = middle - .95 * half, middle + .95 * half
         self.foot_sites = [self.model.site(name).id for name in FEET]
         self.knee_bodies = [self.model.body(name).id for name in CALVES]
-        self.body_scan = torch.tensor(BODY_SCAN, dtype=torch.float32, device=self.device)
-        self.foot_scan = torch.tensor(FOOT_SCAN, dtype=torch.float32, device=self.device)
+        self.spec = observation_spec(cfg.scan_layout)
+        body_scan, foot_scan = SCAN_LAYOUTS[cfg.scan_layout]
+        self.body_scan = torch.tensor(body_scan, dtype=torch.float32, device=self.device)   # (B, 2)
+        self.foot_scan = torch.tensor(foot_scan, dtype=torch.float32, device=self.device)   # (4, F, 2), one set per foot
         self.clearance_scan = torch.tensor([[0, 0], [.1, 0], [-.1, 0], [0, .08], [0, -.08]], dtype=torch.float32, device=self.device)
         self.gap_scan = torch.tensor([[0, 0], [.04, 0], [-.04, 0], [0, .04], [0, -.04]], dtype=torch.float32, device=self.device)
+        ring = np.arange(8) * math.pi / 4
+        self.edge_scan = torch.tensor([[0, 0]] + [[EDGE_RADIUS * math.cos(a), EDGE_RADIUS * math.sin(a)] for a in ring],
+                                      dtype=torch.float32, device=self.device)
         self.speed_limits = torch.tensor([MAX_LINEAR_SPEED] * 3 + [MAX_BODY_RATE] * 3 + [MAX_JOINT_SPEED] * 12, device=self.device)
 
         # Per-robot task state.
@@ -128,6 +138,7 @@ class GoalEnv:
         self.last_contact = zeros(4, dtype=torch.bool)
         self.episode_arrivals = zeros()
         self.episode_misses = zeros()
+        self.episode_progress = zeros()     # largest share of the distance to a target closed this episode
         # Curriculum: terrain column fixed per robot, difficulty level adapts.
         if self.grid is not None:
             self.centres = self.grid.tile_centres(self.device)
@@ -198,6 +209,17 @@ class GoalEnv:
     def observations(self, noise=True):
         return self._observe(self._kinematics(), noise)
 
+    def _scan_points(self, k):
+        """World xy of the terrain samples the policy senses: body points (n, B, 2) and foot points (n, 4, F, 2)."""
+        return (yaw_frame_points(k.pos[:, :2], k.yaw, self.body_scan),
+                yaw_frame_points(k.feet[:, :, :2], k.yaw[:, None], self.foot_scan))
+
+    def scan_points(self):
+        """Viewer helper: the sensed terrain samples as world xyz, z = the sensed height (body (n, B, 3), feet (n, 4, F, 3))."""
+        body, feet = self._scan_points(self._kinematics())
+        return (torch.cat([body, self.terrain.sample(body)[..., None]], -1),
+                torch.cat([feet, self.terrain.sample(feet)[..., None]], -1))
+
     def _observe(self, k, noise=True):
         """Actor observation (optionally noisy) and critic observation (clean + privileged)."""
         clean = self._actor_observation(k, 0.)
@@ -210,8 +232,7 @@ class GoalEnv:
     def _actor_observation(self, k, noise_scale):
         jitter = lambda x, amount: x + (2 * self.rand(*x.shape) - 1) * amount * noise_scale if noise_scale else x
         distance, _, local = self._target_geometry(k)
-        body_points = yaw_frame_points(k.pos[:, :2], k.yaw, self.body_scan)                  # (n, 70, 2)
-        foot_points = yaw_frame_points(k.feet[:, :, :2], k.yaw[:, None], self.foot_scan)     # (n, 4, 9, 2)
+        body_points, foot_points = self._scan_points(k)
         body_scan = (k.pos[:, 2:3] - STANDING_HEIGHT - jitter(self.terrain.sample(body_points), .02)).clamp(-1, 1)
         foot_scan = (k.feet[:, :, 2:3] - jitter(self.terrain.sample(foot_points), .02)).clamp(-1, 1).flatten(1)
         actor = torch.cat([
@@ -219,7 +240,7 @@ class GoalEnv:
             self._command(distance, local), local * (3. / distance.clamp_min(3.))[:, None], distance.clamp(max=3.)[:, None],
             jitter(k.joint_pos - self.home_joints, .01), jitter(k.joint_vel, 1.5) * .05, self.previous_action,
             (k.foot_height < .02).float(), body_scan, foot_scan], -1)
-        assert actor.shape[-1] == OBSERVATION_SPEC['actor_dim']
+        assert actor.shape[-1] == self.spec['actor_dim']
         return actor.clamp(-100, 100)
 
     # ------------------------------------------------------------ resets/targets
@@ -240,7 +261,7 @@ class GoalEnv:
         q[:, 3], q[:, 4:6], q[:, 6] = torch.cos(yaw / 2), 0, torch.sin(yaw / 2)
         self.backend.reset(ids, q)
         for buffer in (self.elapsed, self.previous_action, self.previous_joint_vel, self.air_time,
-                       self.episode_arrivals, self.episode_misses):
+                       self.episode_arrivals, self.episode_misses, self.episode_progress):
             buffer[ids] = 0
         self.last_contact[ids] = True
         self.previous_feet[ids] = self.backend.tensor('site_xpos')[ids][:, self.foot_sites]
@@ -298,20 +319,39 @@ class GoalEnv:
         self.target_budget[ids] = 2. + 2. * self.start_distance[ids] / self.max_speed[ids]
 
     def _update_levels(self, ids, fell):
-        """Curriculum: promote after reaching >= 80% of targets without a fall, demote after a fall or no progress.
+        """Curriculum, chosen by curriculum_rule:
 
-        (Requiring a perfect episode kept stepping-stone robots on level 0 even at
-        91% target success.)
+        strict (v1, v2): promote after reaching >= 80% of the targets without a fall;
+        demote after a fall or when no target was reached. (Requiring a perfect
+        episode kept stepping-stone robots on level 0 even at 91% target success.)
+
+        relaxed (Zhang et al. 2024 style): promote after reaching >= 60% of the
+        targets attempted, a fall counting as a failed attempt; demote only when the
+        robot made no progress: no target reached and less than a quarter of the
+        distance to any target closed. (Demoting on every fall kept v2's pile robots
+        on level 0.) Both rules need at least 2 arrivals to promote.
         """
         arrivals, misses = self.episode_arrivals[ids], self.episode_misses[ids]
-        promote = (arrivals >= 2) & (arrivals >= 4 * misses) & ~fell
-        demote = fell | ((arrivals == 0) & (misses >= 1))
+        if self.cfg.curriculum_rule == 'relaxed':
+            promote = (arrivals >= 2) & (arrivals >= RELAXED_PROMOTE * (arrivals + misses + fell.float()))
+            demote = (arrivals == 0) & (self.episode_progress[ids] < RELAXED_DEMOTE_PROGRESS)
+        else:
+            promote = (arrivals >= 2) & (arrivals >= 4 * misses) & ~fell
+            demote = fell | ((arrivals == 0) & (misses >= 1))
         level = self.level[ids] + promote.long() - demote.long()
         level = level.clamp_min(0)
         # Robots that solved the hardest row restart on a random row (legged_gym).
         top = level >= self.cfg.terrain_levels
         level[top] = torch.randint(0, self.cfg.terrain_levels, (int(top.sum()),), device=self.device, generator=self.generator)
         self.level[ids] = level
+
+    def _edge_drop(self, k):
+        """How far the terrain within EDGE_RADIUS drops below each foot's sole, for feet standing on the highest
+        terrain there (within 2 cm, the contact threshold); 0 for feet in the air. Large at the edge of a pile, a
+        stone or a step, including a foot whose centre already hangs over the drop."""
+        around = self.terrain.sample(k.feet[:, :, None, :2] + self.edge_scan)
+        sole = k.feet[:, :, 2] - FOOT_RADIUS
+        return torch.where(sole - around.amax(-1) < .02, sole - around.amin(-1), torch.zeros_like(sole))
 
     # -------------------------------------------------------------------- step
     def step(self, action, auto_reset=True, chain=True):
@@ -324,6 +364,7 @@ class GoalEnv:
         self.elapsed += dt; self.target_elapsed += dt
         self.path_length += torch.linalg.vector_norm(k.pos[:, :2] - before, dim=-1)
         distance, direction, local = self._target_geometry(k)
+        self.episode_progress = torch.maximum(self.episode_progress, 1 - distance / self.start_distance.clamp_min(1e-3))
 
         # Feet: contact, swing timing (legged_gym touchdown bookkeeping), slip.
         contact = k.foot_height < .02
@@ -362,7 +403,8 @@ class GoalEnv:
             soft_low=self.soft_low, soft_high=self.soft_high, newly_arrived=newly_arrived, fall=fall,
             speed_xy=torch.linalg.vector_norm(k.lin_vel_world[:, :2], dim=-1),
             # How far each foot's sole sits below the highest terrain within 4 cm: positive when it slips into a gap.
-            foot_depth=self.terrain.sample(k.feet[:, :, None, :2] + self.gap_scan).amax(-1) - (k.feet[:, :, 2] - FOOT_RADIUS))
+            foot_depth=self.terrain.sample(k.feet[:, :, None, :2] + self.gap_scan).amax(-1) - (k.feet[:, :, 2] - FOOT_RADIUS),
+            edge_drop=self._edge_drop(k))
         reward, terms = reward_terms.compute(s, cfg.rewards, cfg.reward_params, dt, cfg.only_positive_rewards)
         self.previous_action = action.clone(); self.previous_feet = k.feet; self.previous_joint_vel = k.joint_vel
 

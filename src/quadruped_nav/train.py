@@ -18,7 +18,7 @@ import subprocess
 import time
 import mujoco
 import torch
-from .rl.config import TrainConfig, OBSERVATION_SPEC
+from .rl.config import TrainConfig, observation_spec
 from .rl.env import GoalEnv
 from .rl.evaluation import TerrainEvaluator
 from .rl.policy import ActorCritic, export_bundle, load_controller
@@ -78,7 +78,7 @@ class Statistics:
 def save_checkpoint(path, model, ppo, cfg, update, steps, revision):
     payload = dict(model={k: v.detach().cpu() for k, v in model.state_dict().items()},
                    optimizer=ppo.optimizer.state_dict(), learning_rate=ppo.learning_rate, config=cfg.dict(),
-                   observation_spec=OBSERVATION_SPEC, update=update, steps=steps, source_revision=revision,
+                   observation_spec=observation_spec(cfg.env.scan_layout), update=update, steps=steps, source_revision=revision,
                    versions=dict(python=platform.python_version(), torch=str(torch.__version__), mujoco=mujoco.__version__))
     temporary = path.with_suffix('.tmp'); torch.save(payload, temporary); temporary.replace(path)
 
@@ -94,11 +94,14 @@ def train(cfg, resume=None):
     try: revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
     except Exception: revision = 'unknown'
 
-    model = ActorCritic(cfg.hidden, cfg.init_std).to(device)
+    spec = observation_spec(cfg.env.scan_layout)
+    model = ActorCritic(cfg.hidden, cfg.init_std, spec).to(device)
     ppo = PPO(model, cfg)
     first, steps = 0, 0
     if resume:
         loaded, checkpoint = load_controller(resume, device)
+        if checkpoint['observation_spec'] != spec:
+            raise ValueError(f'{resume} senses the terrain with another scan layout than this config; train it from scratch')
         model.load_state_dict(loaded.state_dict())
         ppo.optimizer.load_state_dict(checkpoint['optimizer']); ppo.learning_rate = checkpoint['learning_rate']
         first, steps = checkpoint['update'], checkpoint['steps']

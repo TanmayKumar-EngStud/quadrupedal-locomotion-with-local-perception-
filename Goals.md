@@ -61,3 +61,16 @@ The guide is [TRAINING_NEXT_RUNS.md](docs/TRAINING_NEXT_RUNS.md).
 | Train v4 for 8 hours on the KTH GPU | Tanmay, Amedeo, Damien | [ ] | — |
 
 `terrain_noise` adds per-element Gaussian deviations (width, length, height, centre position, tilt; risers and treads for stairs) to every training terrain except rough ground; 0.5 for v3, 1.0 for v4. With noise 0 the terrain is unchanged from v1/v2. Steps to run: [TRAINING_NEXT_RUNS.md](docs/TRAINING_NEXT_RUNS.md). The v3/v4 configs also enable two failure-targeted penalties (`arrival_speed` -10 above 0.5 m/s at arrival, `feet_in_gap` -20 for feet more than 3 cm below the neighbouring support) and train on targets 0.4-3 m away. Validated with unit tests (69 pass), a terrain preview and CPU smoke runs; not yet run on the GPU.
+
+## October 21, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Train v3 for 8 hours on the KTH GPU (from scratch; continued from October 20) | Tanmay | [X] | 8 h GPU run (elapsed) |
+| Evaluate v3 against v2 (hop tables, fixed tests at noise 0, 0.5, 1.0) | Tanmay | [X] | Not recorded |
+| Fine-tune configs from v2 at noise 0.5, 1.0 and a control | Tanmay | [X] | Not recorded |
+| Eight 2-hour training variants on top of v2: 49-sample foot scan, noise ramp, relaxed curriculum, edge penalty; configs, viewer markers, guide | Tanmay | [X] | Not recorded |
+| Train variants 1-4 for 2 hours on Tanmay's KTH GPU | Tanmay | [ ] | — |
+| Train variants 5-8 for 2 hours on Amedeo's KTH GPU | Amedeo | [ ] | — |
+
+v3 from scratch is worse than v2 on every test (pile-scene hops 31% vs 86%), so the next runs start from v2. The eight variants, their configs, and the launch and evaluation steps are in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md); watch.py and play.py now draw the terrain samples each controller senses. Validated with unit tests (74 pass) and a 2-update CPU run of every variant config; not yet run on the GPU.

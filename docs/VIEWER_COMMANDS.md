@@ -10,7 +10,19 @@ MuJoCo's `mjpython` themselves, so a window opens; close it to stop. Add
 | `play.py` | a planner choosing piles and the controller walking to them | the pile scenes: 10 layout families, rows 0-9 |
 
 Controllers: `artifacts/controller_v1/controller.pt`, `artifacts/controller_v2/controller.pt`,
-`artifacts/controller_v3/controller.pt` (see "Get controller v3" below).
+`artifacts/controller_v3/controller.pt` (see "Get controller v3" below), and the 2-hour
+variants exported to `artifacts/variant_<RUN>/controller.pt` ([TRAINING_VARIANTS.md](TRAINING_VARIANTS.md)).
+
+**Terrain samples.** Both viewers draw the terrain samples the controller senses as
+small spheres at the sensed height:
+- white: anchored at the base;
+- one colour per foot: FR red, FL green, RR blue, RL yellow.
+
+v1, v2 and v3 show their 10 x 7 body grid (reaching 0.9 m ahead) and 9 samples per
+foot. A `feet49` controller (variants 1, 5, 8) shows a 7 x 7 square at every foot and
+4 samples under the trunk. The terminal names the layout at the start. `--no-scan`
+hides the spheres. On the pile scenes with box ground the sensed pits are 0.5 m deep,
+so samples over a pit float inside the 1.2 m pit: that is what the controller senses.
 
 ## Get controller v3
 
@@ -31,10 +43,11 @@ Both hashes must print `True`, with update 12724.
 | `--checkpoint PATH` | controller to run (default v1) |
 | `--terrain TYPE` | `rough`, `slope`, `stairs_up`, `stairs_down`, `obstacles`, `stepping_stones`, `gaps`, `piles` |
 | `--level 0-9` | difficulty, 0 easiest |
-| `--terrain-noise X` | irregularities: `0` regular (v1/v2 terrain), `0.5` v3's training terrain, `1.0` v4's; default: what the controller trained on |
+| `--terrain-noise X` | irregularities on the chosen level: `0` regular (v1/v2 terrain), `0.5` v3's training terrain, `1.0` v4's; default: what the controller trained on (with a noise ramp, the noise of the chosen level) |
 | `--pile-pits deep\|ramp` | pile pits 0.5 m on every level (like the pile scenes), or deepening with level (v3's training); default: as trained |
 | `--speed M/S` | commanded walking speed (default 0.8) |
 | `--seed N` | other start pose and targets |
+| `--no-scan` | hide the terrain samples |
 
 ### v3 on regular terrain (noise 0)
 
@@ -93,6 +106,7 @@ it: the tile is built from the options above.)
 | `--ground boxes\|heightfield` | piles as MuJoCo boxes (default), or as the heightfield the controller senses |
 | `--seed N` | other layout of the same family and row |
 | `--seconds S` | time limit (default 60) |
+| `--no-scan` | hide the terrain samples |
 
 In the window, the red sphere inside a pale circle is the current subgoal and its
 0.25 m arrival circle; blue spheres are earlier subgoals. The terminal prints every

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import torch
 from torch import nn
-from .config import OBSERVATION_SPEC
+from .config import OBSERVATION_SPEC, observation_spec
 
 
 class RunningNorm(nn.Module):
@@ -49,9 +49,9 @@ class ActorCritic(nn.Module):
     observations plus privileged simulator values (asymmetric actor-critic).
     """
 
-    def __init__(self, hidden=(512, 256, 128), init_std=1.):
+    def __init__(self, hidden=(512, 256, 128), init_std=1., spec=OBSERVATION_SPEC):
         super().__init__()
-        actor_dim, critic_dim = OBSERVATION_SPEC['actor_dim'], OBSERVATION_SPEC['critic_dim']
+        actor_dim, critic_dim = spec['actor_dim'], spec['critic_dim']
         self.actor = mlp(actor_dim, hidden, 12, .01)
         self.critic = mlp(critic_dim, hidden, 1, 1.)
         self.log_std = nn.Parameter(torch.full((12,), float(torch.log(torch.tensor(init_std)))))
@@ -78,9 +78,10 @@ class InferenceActor(nn.Module):
 
 def load_controller(path, device='cpu'):
     checkpoint = torch.load(path, map_location=device, weights_only=True)
-    if checkpoint.get('observation_spec') != OBSERVATION_SPEC:
+    spec = observation_spec(checkpoint['config']['env'].get('scan_layout', 'v1'))
+    if checkpoint.get('observation_spec') != spec:
         raise ValueError('Checkpoint observation contract does not match this code')
-    model = ActorCritic(checkpoint['config']['hidden']).to(device)
+    model = ActorCritic(checkpoint['config']['hidden'], spec=spec).to(device)
     model.load_state_dict(checkpoint['model']); model.eval()
     return model, checkpoint
 
@@ -91,9 +92,10 @@ def export_bundle(checkpoint_path, destination):
     model, checkpoint = load_controller(checkpoint_path)
     destination = Path(destination); destination.mkdir(parents=True, exist_ok=True)
     shutil.copy2(checkpoint_path, destination / 'controller.pt')
-    actor = torch.jit.trace(InferenceActor(model).eval(), torch.zeros(1, OBSERVATION_SPEC['actor_dim']))
+    spec = checkpoint['observation_spec']
+    actor = torch.jit.trace(InferenceActor(model).eval(), torch.zeros(1, spec['actor_dim']))
     actor.save(str(destination / 'actor.ts'))
-    manifest = dict(format='quadruped-controller/v3', observation_spec=OBSERVATION_SPEC, config=checkpoint['config'],
+    manifest = dict(format='quadruped-controller/v3', observation_spec=spec, config=checkpoint['config'],
                     steps=checkpoint['steps'], update=checkpoint['update'], source_revision=checkpoint.get('source_revision'),
                     versions=checkpoint.get('versions'),
                     trained_performance='See evaluation.jsonl of the run; evaluate held-out scenes before use')

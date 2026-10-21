@@ -7,8 +7,8 @@ import mujoco
 torch = pytest.importorskip('torch')
 from quadruped_nav.terrain import generate_terrain, TERRAINS
 from quadruped_nav.mjcf import build_mjcf
-from quadruped_nav.rl.config import EnvConfig, TrainConfig, OBSERVATION_SPEC, default_rewards, default_reward_params
-from quadruped_nav.rl.env import GoalEnv, robots_per_type
+from quadruped_nav.rl.config import EnvConfig, TrainConfig, OBSERVATION_SPEC, observation_spec, default_rewards, default_reward_params
+from quadruped_nav.rl.env import GoalEnv, robots_per_type, FOOT_RADIUS
 from quadruped_nav.rl.terrain_grid import TerrainGrid, HeightGrid, TERRAIN_TYPES, pile_pit_depth, pit_depth
 from quadruped_nav.rl.robot import build_training_model
 from quadruped_nav.rl.policy import load_controller, export_bundle
@@ -175,6 +175,20 @@ def test_tile_variants_and_robots_drawing_them():
     assert ((q[:, 1] > tile_y) & (q[:, 1] < tile_y + 4.)).all()   # every robot stands on its own tile
 
 
+def test_noise_ramp_grows_the_irregularities_with_the_level():
+    kinds = ('stepping_stones', 'piles')
+    ramp = TerrainGrid(kinds, levels=5, tile_size=4., seed=4, noise=1., noise_ramp=4)
+    assert [ramp.level_noise(level) for level in range(5)] == [0., .25, .5, .75, 1.]
+    tiles = lambda grid: {t[0]: t[3] for t in grid.tiles()}
+    ramped = tiles(ramp)
+    for noise, level in ((0., 0), (.5, 2), (1., 4)):     # each level matches a grid with that level's noise everywhere
+        same = tiles(TerrainGrid(kinds, levels=5, tile_size=4., seed=4, noise=noise))
+        for column in range(2):              # the last row and column belong to the neighbouring tiles
+            assert np.array_equal(ramped[f'tile_{level}_{column}'][:-1, :-1], same[f'tile_{level}_{column}'][:-1, :-1])
+    env = GoalEnv(small_config(terrain_types=['piles'], tile_size=4., terrain_noise=1., terrain_noise_ramp=4))
+    assert env.grid.level_noise(1) == .25
+
+
 def test_time_budget_stops_training_and_validation_tiles_are_unseen(tmp_path):
     cfg = TrainConfig(env=small_config(num_envs=2), updates=50, rollout_steps=2, epochs=1, minibatches=1, hidden=[16],
                       checkpoint_every=10, evaluation_every=10, max_hours=1e-9, validation_seed=100,
@@ -196,6 +210,21 @@ def test_arrival_speed_and_feet_in_gap_penalties():
     for _ in range(5):
         _, _, _, _, info = env.step(torch.zeros(2, 12))
     assert float(info['reward_terms']['feet_in_gap'].abs().max()) < 1e-6    # standing on level ground costs nothing
+
+
+def test_feet_edge_penalty_marks_supported_feet_near_a_drop():
+    env = GoalEnv(small_config(num_envs=1, terrain_types=['rough']))
+    step = np.zeros((101, 101), dtype=np.float32); step[:, 50:] = -.5         # a 0.5 m drop at x = 0.5 m
+    env.terrain = HeightGrid(step, 0., 0., .01, outside=0.)
+    feet = torch.tensor([[[.30, .5, FOOT_RADIUS], [.47, .5, FOOT_RADIUS],    # far from the edge; 3 cm from it
+                          [.52, .5, FOOT_RADIUS], [.47, .5, .20]]])          # centre over the drop; in the air
+    drop = env._edge_drop(SimpleNamespace(feet=feet))
+    assert torch.allclose(drop, torch.tensor([[0., .5, .5, 0.]]), atol=1e-4)
+    assert float(rewards._reward_feet_edge(SimpleNamespace(edge_drop=drop), default_reward_params())) == 2.
+    env = GoalEnv(small_config(num_envs=2, terrain_types=['rough'], rewards={'feet_edge': -1.}))
+    for _ in range(5):
+        _, _, _, _, info = env.step(torch.zeros(2, 12))
+    assert float(info['reward_terms']['feet_edge'].abs().max()) == 0.       # level ground has no edges
 
 
 def test_run_configs_change_only_the_reward_values_they_list():
@@ -266,6 +295,45 @@ def test_curriculum_promotes_after_clean_episodes():
     assert env.level.tolist() == [1, 0]
 
 
+def test_relaxed_curriculum_promotes_at_60_percent_and_demotes_only_without_progress():
+    env = GoalEnv(small_config(num_envs=6, terrain_levels=3, curriculum_rule='relaxed'))
+    env.level[:] = 1
+    env.episode_arrivals[:] = torch.tensor([3., 2., 2., 0., 0., 1.])
+    env.episode_misses[:] = torch.tensor([2., 0., 2., 1., 1., 3.])
+    env.episode_progress[:] = torch.tensor([1., 1., 1., .1, .5, 1.])
+    fell = torch.tensor([False, True, False, True, True, False])
+    env._update_levels(torch.arange(6), fell)
+    # 3 of 5 targets: up; 2 then a fall (2 of 3): up; 2 of 4: stay; no target and 10% closed: down;
+    # no target but half the distance closed: stay despite the fall; 1 of 4: stay
+    assert env.level.tolist() == [2, 2, 1, 0, 1, 1]
+    strict = GoalEnv(small_config(num_envs=1, terrain_levels=3)); strict.level[:] = 1
+    strict.episode_arrivals[:] = 2.; strict._update_levels(torch.arange(1), torch.tensor([True]))
+    assert strict.level.tolist() == [0]                 # the strict rule demotes on any fall
+    env.reset(torch.arange(6)); assert float(env.episode_progress.abs().max()) == 0.
+
+
+def test_feet49_scan_layout():
+    spec = observation_spec('feet49')
+    assert spec['actor_dim'] == 55 + 200 and len(spec['body_scan']) == 4 and [len(f) for f in spec['foot_scan']] == [49] * 4
+    assert observation_spec() == OBSERVATION_SPEC and 'scan_layout' not in OBSERVATION_SPEC   # v1-v3 checkpoints still load
+    env = GoalEnv(small_config(num_envs=1, scan_layout='feet49'))
+    obs, critic = env.observations(False)
+    assert obs.shape == (1, 255) and critic.shape == (1, 261) and torch.isfinite(obs).all()
+    k = env._kinematics(); _, feet = env._scan_points(k)
+    c, s = torch.cos(-k.yaw[0]), torch.sin(-k.yaw[0])
+    d = feet[0] - k.pos[0, :2]
+    local = torch.stack([c * d[..., 0] - s * d[..., 1], s * d[..., 0] + c * d[..., 1]], -1)    # (4, 49, 2), base frame
+    boxes = [(local[i, :, 0].min(), local[i, :, 0].max(), local[i, :, 1].min(), local[i, :, 1].max()) for i in range(4)]
+    for i in range(4):
+        for j in range(i + 1, 4):            # in the standing pose no two squares overlap
+            assert boxes[i][1] < boxes[j][0] or boxes[j][1] < boxes[i][0] or boxes[i][3] < boxes[j][2] or boxes[j][3] < boxes[i][2]
+    foot = k.feet[0, :, :2] - k.pos[0, :2]
+    foot = torch.stack([c * foot[:, 0] - s * foot[:, 1], s * foot[:, 0] + c * foot[:, 1]], -1)
+    assert torch.allclose(torch.linalg.vector_norm(local - foot[:, None], dim=-1).amin(-1), torch.zeros(4), atol=1e-4)   # one sample under each foot
+    body, feet = env.scan_points()
+    assert body.shape == (1, 4, 3) and feet.shape == (1, 4, 49, 3)
+
+
 def test_generalized_advantage_estimation_respects_episode_ends():
     rollout = Rollout(actor_obs=None, critic_obs=None, actions=None, log_probs=None,
                       values=torch.zeros(2, 2), rewards=torch.ones(2, 2), dones=torch.tensor([[False, True], [False, False]]),
@@ -290,6 +358,14 @@ def test_training_export_reload_and_resume(tmp_path):
     _, resumed = load_controller(checkpoint); assert resumed['steps'] == 16
     corrupt = dict(resumed); corrupt['observation_spec'] = {}; torch.save(corrupt, tmp_path / 'bad.pt')
     with pytest.raises(ValueError): load_controller(tmp_path / 'bad.pt')
+    other = replace(cfg, env=replace(cfg.env, scan_layout='feet49'), updates=1, output=str(tmp_path / 'feet49'))
+    with pytest.raises(ValueError): train(other, resume=checkpoint)          # a v1-layout controller cannot be resumed
+    feet49 = train(other)
+    model, loaded = load_controller(feet49)
+    assert loaded['observation_spec']['actor_dim'] == 255 and loaded['config']['env']['scan_layout'] == 'feet49'
+    export_bundle(feet49, tmp_path / 'feet49_bundle')
+    x = torch.randn(2, 255)
+    assert torch.allclose(torch.jit.load(str(tmp_path / 'feet49_bundle/actor.ts'))(x), model.act(x), atol=1e-6)
 
 
 def test_planner_execution_on_a_project_scene(tmp_path):
