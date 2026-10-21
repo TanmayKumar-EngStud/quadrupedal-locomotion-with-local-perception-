@@ -6,6 +6,35 @@ moderate, v4 high), against v2. Background on the training recipe and every pitf
 found so far: [GOAL_REACHING_V3.md](GOAL_REACHING_V3.md). Server setup in general:
 [RUNBOOK.md](RUNBOOK.md) sections 2-4.
 
+## Update, October 21: fine-tune from v2 instead
+
+v3 trained from scratch (`configs/kth-controller-v3.json`) finished its 8 hours but is
+worse than v2 on every test (pile-scene hops 31% vs 86%, fixed test 66% vs 88%):
+validation stopped improving after about 2 hours while the action noise drifted from
+1.0 to 1.86, and pile robots stayed on the shallow-pit levels. The RQ1 runs are
+therefore fine-tunes from v2's weights, as v2 was fine-tuned from v1:
+
+| Config | Noise | Purpose |
+| --- | --- | --- |
+| `configs/kth-controller-v3-from-v2.json` | 0.5 | moderate-noise controller |
+| `configs/kth-controller-v4-from-v2.json` | 1.0 | high-noise controller |
+| `configs/kth-controller-v2-continued.json` | 0 | control: the same extra training without noise |
+
+All three: v2's terrain mix, deep pile pits, start levels 0-9, entropy 0.001 (stops
+the noise drift), `arrival_speed` and `feet_in_gap` on, targets 0.4-3 m, 3 hours each.
+Launch all three in parallel (each about 3-4 GB of GPU memory), each with
+`--resume runs/kth-controller-v2/update_004000.pt`:
+
+```sh
+for RUN in v3-from-v2 v4-from-v2 v2-continued; do
+  setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-controller-$RUN.json \
+      --resume runs/kth-controller-v2/update_004000.pt > runs/kth-controller-$RUN.log 2>&1 < /dev/null &
+  sleep 5
+done
+```
+
+The sections below describe the settings and the from-scratch v3 run.
+
 ## What is implemented
 
 | Setting (in `env` of the run config) | v3 | v4 | Meaning |
