@@ -519,6 +519,61 @@ A `feet49` controller shows its four 7 x 7 squares; a `v1` controller shows its
 10 x 7 body grid and 9 samples per foot. `--no-scan` hides them. More commands:
 [VIEWER_COMMANDS.md](VIEWER_COMMANDS.md).
 
+## Round 1 results (variants 1-4, Tanmay's GPU, October 21)
+
+Hops arrived on the pile scenes, rows 0-9, measured under the current hop rule:
+
+| | v1 | v2 | 1 | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- | --- | --- |
+| box ground | 42% | 86% | 0% | 86% | **94%** | 84% |
+| heightfield ground | 31% | 71% | 0% | 76% | 75% | 62% |
+
+Charts and the extracted data are in `outputs/comparison_v3/` on Tanmay's laptop.
+
+- Variant 1 (49-point scan from scratch) reached 51% on the fixed test after 945
+  updates, but its pile robots never left level 0.
+- Variant 3 is the best fine-tune.
+- Variant 4 keeps pile robots on level 5.6 but times out more often.
+
+## Round 2: variants 5 and 8 continued from variant 1 for 6 hours
+
+Variant 1's 49-point network is the starting point. Both runs resume from
+`runs/kth-variant-1-feet49/last.pt` (update 945) on Tanmay's GPU, side by side:
+
+| Config | Change on top of variant 1 | Output |
+| --- | --- | --- |
+| `configs/kth-variant-5-6h-from-1.json` | noise ramp (1.0 at level 4 and above, regular on level 0) | `runs/kth-variant-5-6h-from-1` |
+| `configs/kth-variant-8-6h-from-1.json` | relaxed curriculum | `runs/kth-variant-8-6h-from-1` |
+
+Shared settings that differ from round 1:
+
+| Setting | Round 1 | Round 2 | Why |
+| --- | --- | --- | --- |
+| `num_envs` | 4096 | 8192 | twice the robots simulated in parallel per run |
+| `terrain_variants` | 2 | 4 | four independent tiles per terrain type and level, for training and for the validation tiles (seed 100) |
+| `evaluation_trials`, `evaluation_levels` | 4 robots, levels 0/3/6/9 (128 robots) | 8 robots, levels 0-9 (640 robots) | a five times larger validation set every 25 updates |
+| `max_hours` | 2 | 6 | |
+| `entropy` | 0.005 | 0.001 | variant 1's action noise began to drift upwards after update 300 (0.74 to 0.78), as v3's did |
+
+Launch (from the repository folder on the server):
+
+```sh
+for RUN in 5 8; do
+  setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-variant-$RUN-6h-from-1.json \
+      --resume runs/kth-variant-1-feet49/last.pt > runs/kth-variant-$RUN-6h-from-1.log 2>&1 < /dev/null &
+  sleep 5
+done
+```
+
+**Larger test set.** After the runs finish, test with 16 robots per terrain type and
+level, all 10 levels, on four tile variants:
+- `goal_check --trials 16 --levels 0 1 2 3 4 5 6 7 8 9 --terrain-from configs/kth-variant-5-6h-from-1.json`
+  (1,280 robots per noise level);
+- hop tables with `calibrate --trials 48` (twice as many episodes).
+
+Run v2, variant 1 and variant 3 through the same tests, so all of them are compared on
+the same larger test set.
+
 ## Implementation reference
 
 | Setting (`env` block) | Values | Code | Test (`tests/test_training.py`) |
@@ -526,6 +581,7 @@ A `feet49` controller shows its four 7 x 7 squares; a `v1` controller shows its
 | `scan_layout` | `v1` (default), `feet49` | `SCAN_LAYOUTS`, `observation_spec()` in `rl/config.py`; `GoalEnv._scan_points()` in `rl/env.py`; `load_controller()` in `rl/policy.py` reads the layout from the checkpoint | `test_feet49_scan_layout`, `test_training_export_reload_and_resume` |
 | `terrain_noise_ramp` | 0 (default), L > 0 | `TerrainGrid.level_noise()` in `rl/terrain_grid.py` | `test_noise_ramp_grows_the_irregularities_with_the_level` |
 | `curriculum_rule` | `strict` (default), `relaxed` | `GoalEnv._update_levels()`, `episode_progress` | `test_relaxed_curriculum_promotes_at_60_percent_and_demotes_only_without_progress` |
+| `evaluation_trials`, `evaluation_levels` (top level) | 4, None (levels 0/3/6/9) | `train.py` passes them to `TerrainEvaluator`; `goal_check --trials --levels` for tests | `test_validation_size_follows_the_config` |
 | `rewards.feet_edge`, `reward_params.edge_drop` | 0 (off), 0.05 m | `_reward_feet_edge()` in `rl/rewards.py`, `GoalEnv._edge_drop()` | `test_feet_edge_penalty_marks_supported_feet_near_a_drop` |
 | viewer markers | on, `--no-scan` | `src/quadruped_nav/markers.py`, `watch.py`, `evaluate.py` (play.py) | |
 

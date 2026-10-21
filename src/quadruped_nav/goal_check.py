@@ -32,7 +32,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--checkpoint', required=True)
     parser.add_argument('--backend', choices=['native', 'warp'], default='native')
-    parser.add_argument('--trials', type=int, default=4)
+    parser.add_argument('--trials', type=int, default=4, help='robots per terrain type and level')
+    parser.add_argument('--levels', type=int, nargs='+', default=[0, 3, 6, 9], help='difficulty levels to test')
     parser.add_argument('--terrain-types', nargs='+', help='terrain types to test (default: the checkpoint\'s)')
     parser.add_argument('--terrain-from', help='take the terrain settings from this run config')
     parser.add_argument('--terrain-noise', type=float, help='irregularity scale of the test tiles, the same on every level (0 = regular)')
@@ -50,7 +51,7 @@ def main():
         cfg = replace(cfg, terrain_types=a.terrain_types, terrain_weights=None)
     if a.terrain_noise is not None:
         cfg = replace(cfg, terrain_noise=a.terrain_noise, terrain_noise_ramp=0)
-    result = TerrainEvaluator(cfg, trials=a.trials, seed=a.seed).run(policy)
+    result = TerrainEvaluator(cfg, trials=a.trials, levels=a.levels, seed=a.seed).run(policy)
     result.update(checkpoint=a.checkpoint, checkpoint_update=saved['update'], config=asdict(cfg))
     path = Path(a.output); path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2) + '\n')

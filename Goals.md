@@ -70,7 +70,10 @@ The guide is [TRAINING_NEXT_RUNS.md](docs/TRAINING_NEXT_RUNS.md).
 | Evaluate v3 against v2 (hop tables, fixed tests at noise 0, 0.5, 1.0) | Tanmay | [X] | Not recorded |
 | Fine-tune configs from v2 at noise 0.5, 1.0 and a control | Tanmay | [X] | Not recorded |
 | Eight 2-hour training variants on top of v2: 49-sample foot scan, noise ramp, relaxed curriculum, edge penalty; configs, viewer markers, guide | Tanmay | [X] | Not recorded |
-| Train variants 1-4 for 2 hours on Tanmay's KTH GPU | Tanmay | [ ] | — |
 | Train variants 5-8 for 2 hours on Amedeo's KTH GPU | Amedeo | [ ] | — |
+| Train variants 1-4 for 2 hours on Tanmay's KTH GPU and evaluate them against v1 and v2 | Tanmay | [X] | 2 h GPU runs (elapsed) |
+| Continue variant 1 as variants 5 and 8 for 6 hours (8192 robots per run, 4 tile variants, larger validation set) | Tanmay | [ ] | — |
 
 v3 from scratch is worse than v2 on every test (pile-scene hops 31% vs 86%), so the next runs start from v2. The eight variants, their configs, and the launch and evaluation steps are in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md); watch.py and play.py now draw the terrain samples each controller senses. Validated with unit tests (74 pass) and a 2-update CPU run of every variant config; not yet run on the GPU.
+
+Variants 1-4 ran for 2 hours each on Tanmay's GPU; variant 3 (noise 0.5 + edge penalty) is the best so far (94% of pile-scene hops on box ground against v2's 86%). Variants 5 and 8 now continue from variant 1's 49-point network for 6 hours with 8192 robots per run, four tile variants and a 640-robot validation set (round 2 in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md)).
