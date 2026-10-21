@@ -119,6 +119,8 @@ class TrainConfig:
     checkpoint_every: int = 50
     evaluation_every: int = 50       # fixed-target evaluation on every terrain type
     validation_seed: int = None      # run that evaluation on unseen tiles from this seed (None: training tiles)
+    evaluation_trials: int = 4       # robots per (terrain type, level) in that evaluation
+    evaluation_levels: list = None   # levels it tests (None: 0, 3, 6, 9)
     max_hours: float = None          # stop after this much training time, whatever `updates` says
     output: str = "runs/goal-v3"
 
@@ -127,8 +129,11 @@ class TrainConfig:
         data = json.loads(Path(path).read_text())
         data["env"] = EnvConfig(**data.get("env", {}))
         result = cls(**data); result.env.validate()
-        if min(result.updates, result.rollout_steps, result.epochs, result.minibatches, result.checkpoint_every) < 1:
+        if min(result.updates, result.rollout_steps, result.epochs, result.minibatches, result.checkpoint_every,
+               result.evaluation_trials) < 1:
             raise ValueError("Training counts must be positive")
+        if result.evaluation_levels is not None and not all(0 <= level < result.env.terrain_levels for level in result.evaluation_levels):
+            raise ValueError("evaluation_levels must be terrain levels")
         return result
 
     def dict(self): return asdict(self)

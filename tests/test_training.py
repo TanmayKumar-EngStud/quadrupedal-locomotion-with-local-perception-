@@ -199,6 +199,16 @@ def test_time_budget_stops_training_and_validation_tiles_are_unseen(tmp_path):
     assert len((tmp_path / 'run/evaluation.jsonl').read_text().splitlines()) == 1
 
 
+def test_validation_size_follows_the_config(tmp_path):
+    cfg = TrainConfig(env=small_config(num_envs=2), updates=1, rollout_steps=2, epochs=1, minibatches=1, hidden=[16],
+                      checkpoint_every=1, evaluation_every=1, evaluation_trials=2, evaluation_levels=[0, 1],
+                      output=str(tmp_path / 'run'))
+    train(cfg)
+    record = json.loads((tmp_path / 'run/evaluation.jsonl').read_text().splitlines()[0])
+    assert record['trials_per_cell'] == 2 and record['levels'] == [0, 1]
+    assert record['overall']['trials'] == len(cfg.env.terrain_types) * 2 * 2
+
+
 def test_arrival_speed_and_feet_in_gap_penalties():
     state = SimpleNamespace(speed_xy=torch.tensor([.4, 1., 1.5, 1.5]), newly_arrived=torch.tensor([True, True, True, False]),
                             foot_depth=torch.tensor([[0., .01, .05, .5]] * 4))

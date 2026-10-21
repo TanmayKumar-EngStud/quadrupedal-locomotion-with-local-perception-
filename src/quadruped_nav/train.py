@@ -110,8 +110,9 @@ def train(cfg, resume=None):
     evaluator = None
     if cfg.evaluation_every:
         # Unseen validation tiles when validation_seed is set, else the training tiles.
-        evaluator = (TerrainEvaluator(cfg.env, seed=cfg.validation_seed) if cfg.validation_seed is not None
-                     else TerrainEvaluator(cfg.env, grid=env.grid))
+        size = dict(trials=cfg.evaluation_trials, **({'levels': cfg.evaluation_levels} if cfg.evaluation_levels else {}))
+        evaluator = (TerrainEvaluator(cfg.env, seed=cfg.validation_seed, **size) if cfg.validation_seed is not None
+                     else TerrainEvaluator(cfg.env, grid=env.grid, **size))
     obs, critic_obs = env.observations()
     if not resume:
         model.actor_norm.update(obs); model.critic_norm.update(critic_obs)
