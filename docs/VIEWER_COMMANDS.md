@@ -106,11 +106,22 @@ it: the tile is built from the options above.)
 | `--ground boxes\|heightfield` | piles as MuJoCo boxes (default), or as the heightfield the controller senses |
 | `--seed N` | other layout of the same family and row |
 | `--seconds S` | time limit (default 60) |
+| `--arrival-radius M` | a subgoal pile counts as reached within this distance of its centre (default 0.20 m) |
 | `--no-scan` | hide the terrain samples |
 
 In the window, the red sphere inside a pale circle is the current subgoal and its
-0.25 m arrival circle; blue spheres are earlier subgoals. The terminal prints every
+0.20 m arrival circle; blue spheres are earlier subgoals. The terminal prints every
 planner decision (time, pile position, hop length, reason).
+
+Since October 22 the planner loop:
+- counts a pile as reached only within 0.20 m of its centre;
+- judges each hop from the centre of the pile the robot stands on;
+- does not send the robot straight back to the pile it came from (unless no other
+  pile is allowed).
+
+Before, a robot on the seam between two piles "reached" both, and the planner
+bounced between them (variant 3: 1 of 10 test scenes reached the goal before the
+fix, 6 of 10 after). Calibration's hop tables are measured as before.
 
 ### v3 on every layout family
 
