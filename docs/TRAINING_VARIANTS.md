@@ -574,6 +574,122 @@ level, all 10 levels, on four tile variants:
 Run v2, variant 1 and variant 3 through the same tests, so all of them are compared on
 the same larger test set.
 
+### Round 2 results (October 22)
+
+The larger test set: fixed test with 1,280 robots per noise level, and hop tables with
+48 episodes per family and row. Variant 5 ended at update 4,234, variant 8 at 4,299.
+
+| | Box-ground hops | Heightfield hops | Fixed test, regular / noise 1.0 | Robots that fell (regular) |
+| --- | --- | --- | --- | --- |
+| v2 | 86% | 71% | 79% / 76% | 20% |
+| variant 1 | 0% | 0% | 52% / 49% | 19% |
+| variant 3 | **94%** | **75%** | 82% / 80% | 13% |
+| variant 5 | 73% (26% falls) | 56% | **83% / 82%** | 13% |
+| variant 8 | 57% (34% timeouts) | 38% | 78% / 77% | **9%** |
+
+- Variant 5 matches variant 3 on the general fixed test, but on the pile scenes it
+  still falls between narrow piles (18% of hops at row 9, against 79% for variant 3).
+- Variant 8's relaxed curriculum made it slow, as variant 4's did: many of its hops
+  time out.
+
+Charts: `outputs/comparison_round2/` on Tanmay's laptop.
+
+## Variant 9 (round 3): variant 5 with the edge penalty and foot clearance (6 hours)
+
+Variant 9's files keep the name they were launched with: config
+`configs/kth-variant-5-edge-clearance-6h.json`, run folder
+`runs/kth-variant-5-edge-clearance-6h`, bundle `artifacts/variant_5-edge-clearance`.
+The config resumes from
+`runs/kth-variant-5-6h-from-1/last.pt` (update 4234). It is round 2's variant 5
+config with only the rewards changed:
+
+| Reward | Variant 5 | Variant 9 | What it does |
+| --- | --- | --- | --- |
+| `feet_edge` | 0 | -1 | penalises each standing foot with a drop deeper than 5 cm within 5 cm (as variant 3) |
+| `feet_clearance` | 0 | 0.5 | Lab 1 C's foot clearance (`perceptive_go1.py`), see below |
+
+**Foot clearance** (`_reward_feet_clearance` in `rl/rewards.py`, swing bookkeeping in
+`GoalEnv.step`):
+- During each swing, the foot centre's highest point above the terrain below it is
+  tracked.
+- At touchdown, if the swing lasted at least 0.08 s, the reward pays
+  min(peak / 0.10 m, 1) per foot, and only while the robot is walking to a target.
+  The peak is then reset.
+- Lab 1 C weighted it 0.1 against a tracking weight of 1.0. Here tracking is
+  weighted 1.5, and the other touchdown reward (`feet_air_time`) 0.5, so the run
+  uses 0.5.
+
+The aim is to lift the feet clear of pile edges, together with the edge penalty, and
+so cut variant 5's falls between narrow piles.
+
+```sh
+setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-variant-5-edge-clearance-6h.json \
+    --resume runs/kth-variant-5-6h-from-1/last.pt > runs/kth-variant-5-edge-clearance-6h.log 2>&1 < /dev/null &
+```
+
+## Controller family tree
+
+An arrow means "continues training from" (`--resume`: same weights, normalizer, optimizer
+and update counter), so update numbers are cumulative along each path. The two scan
+families cannot be mixed: their networks have different input sizes. Box-ground hop
+success is from the hop tables on the pile scenes, rows 0-9, under the current hop rule.
+
+```mermaid
+flowchart TD
+  subgraph OLD["Old terrain scan: 106 samples, 161 inputs"]
+    direction TB
+    V1["v1 · updates 1–3000<br/>from scratch, 7 terrain types<br/>3 phases, pit-depth curriculum from 400<br/>box hops 42%"]
+    V1C["v1 control · 3001–4000<br/>same 7 types, no piles<br/>control run for v2"]
+    V2["v2 · 3001–4000<br/>adds pile tiles: 8th type, 0.5 m pits<br/>40% of robots on piles<br/>box hops 86%"]
+    VA2["variant 2 · 4001–4923 · 2 h<br/>noise ramp: regular on level 0,<br/>noise 1.0 from level 4<br/>box hops 86%"]
+    VA3["variant 3 · 4001–4916 · 2 h<br/>noise 0.5, edge −1, gap −20,<br/>arrival speed −5<br/>box hops 94%, best on piles"]
+    VA4["variant 4 · 4001–4940 · 2 h<br/>relaxed curriculum<br/>box hops 84%, many timeouts"]
+    V1 --> V1C
+    V1 --> V2
+    V2 --> VA2
+    V2 --> VA3
+    V2 --> VA4
+  end
+  subgraph SCRATCH["Separate run from scratch"]
+    V3["v3 · 1–12724 · 8 h<br/>8 types, noise 0.5, shallow-pit ramp,<br/>gap and arrival-speed penalties<br/>box hops 31%"]
+  end
+  subgraph NEW["New terrain scan: 49 points per foot + 4 under the body, 255 inputs"]
+    direction TB
+    VA1["variant 1 · 1–945 · 2 h<br/>from scratch, 49-point foot scan,<br/>original rewards<br/>box hops 0%"]
+    VA5["variant 5 · 946–4234 · 6 h<br/>noise ramp, 8192 robots,<br/>4 tile variants, entropy 0.001<br/>box hops 73%, best general test"]
+    VA8["variant 8 · 946–4299 · 6 h<br/>relaxed curriculum, 8192 robots<br/>box hops 57%, many timeouts"]
+    VA9["variant 9 · from 4235 · 6 h<br/>variant 5 + edge −1<br/>+ foot clearance 0.5 (Lab 1 C)<br/>in progress"]
+    VA1 --> VA5
+    VA1 --> VA8
+    VA5 --> VA9
+  end
+  classDef best fill:#E1F5EE,stroke:#0F6E56,color:#085041
+  classDef weak fill:#F1EFE8,stroke:#888780,color:#444441
+  classDef running fill:#EEEDFE,stroke:#534AB7,color:#3C3489,stroke-dasharray:5 4
+  class VA3,VA5 best
+  class V3,VA1 weak
+  class VA9 running
+```
+
+| Controller | Starts from | What changed for its training | Box hops |
+| --- | --- | --- | --- |
+| v1 | scratch | 7 terrain types (rough, slope, stairs up and down, obstacles, stepping stones, gaps), old 106-sample scan; 3 phases, a pit-depth curriculum from update 400 | 42% |
+| v1 control | v1 | 1,000 more updates on the same 7 types, no piles: the control for v2 | |
+| v2 | v1 | an 8th terrain type, piles over 0.5 m pits, with 40% of robots on it | 86% |
+| v3 | scratch | 8 types, irregular terrain (noise 0.5), pits deepening with level, gap and arrival-speed penalties, 8 h | 31% |
+| variant 1 | scratch | the new 49-point foot scan (200 samples, 255 inputs), original rewards, 2 h | 0% |
+| variant 2 | v2 | noise ramp: regular level 0, irregularities growing to noise 1.0 by level 4; robots start on levels 0-2 | 86% |
+| variant 3 | v2 | noise 0.5 everywhere, edge penalty -1, gap penalty -20, arrival-speed penalty -5 | 94% |
+| variant 4 | v2 | relaxed curriculum: promote at 60% of targets, demote only without progress | 84% |
+| variant 5 | variant 1 | noise ramp, 6 h, 8,192 robots, 4 tile variants, 640-robot validation, entropy 0.001 | 73% |
+| variant 8 | variant 1 | relaxed curriculum, otherwise as variant 5 | 57% |
+| variant 9 | variant 5 | edge penalty -1 and foot clearance 0.5 (Lab 1 C), otherwise as variant 5 | in progress |
+
+Configs written but not run: `kth-controller-v3-from-v2`, `kth-controller-v4-from-v2`,
+`kth-controller-v2-continued`, `kth-variant-0-control`, `kth-variant-0-scratch-v1-scan`,
+and round 1's 2-hour variants 5-8 for Amedeo's GPU. Variants 5 and 8 were trained in
+round 2 instead, from variant 1.
+
 ## Implementation reference
 
 | Setting (`env` block) | Values | Code | Test (`tests/test_training.py`) |
@@ -582,6 +698,7 @@ the same larger test set.
 | `terrain_noise_ramp` | 0 (default), L > 0 | `TerrainGrid.level_noise()` in `rl/terrain_grid.py` | `test_noise_ramp_grows_the_irregularities_with_the_level` |
 | `curriculum_rule` | `strict` (default), `relaxed` | `GoalEnv._update_levels()`, `episode_progress` | `test_relaxed_curriculum_promotes_at_60_percent_and_demotes_only_without_progress` |
 | `evaluation_trials`, `evaluation_levels` (top level) | 4, None (levels 0/3/6/9) | `train.py` passes them to `TerrainEvaluator`; `goal_check --trials --levels` for tests | `test_validation_size_follows_the_config` |
+| `rewards.feet_clearance`, `reward_params.clearance_target`, `clearance_min_air_time` | 0 (off), 0.10 m, 0.08 s | `_reward_feet_clearance()` in `rl/rewards.py`, `GoalEnv.swing_peak` | `test_feet_clearance_pays_the_swing_height_on_touchdown` |
 | `rewards.feet_edge`, `reward_params.edge_drop` | 0 (off), 0.05 m | `_reward_feet_edge()` in `rl/rewards.py`, `GoalEnv._edge_drop()` | `test_feet_edge_penalty_marks_supported_feet_near_a_drop` |
 | viewer markers | on, `--no-scan` | `src/quadruped_nav/markers.py`, `watch.py`, `evaluate.py` (play.py) | |
 

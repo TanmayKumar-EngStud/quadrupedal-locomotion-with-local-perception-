@@ -1,0 +1,16 @@
+{
+  "env": {
+    "num_envs": 8192, "backend": "warp", "device": "cuda:0", "seed": 0,
+    "terrain_types": ["rough", "slope", "stairs_up", "stairs_down", "obstacles", "stepping_stones", "gaps", "piles"],
+    "terrain_weights": [8, 8, 14, 10, 8, 15, 12, 25],
+    "terrain_resolution": 0.05, "fine_terrain_resolution": 0.025, "terrain_levels": 10,
+    "terrain_noise": 1.0, "terrain_noise_ramp": 4, "terrain_variants": 4, "pile_pit_ramp": false, "max_start_level": 2, "target_distance": [0.4, 3.0], "curriculum_rule": "strict", "scan_layout": "feet49",
+    "rewards": {"feet_in_gap": 0.0, "feet_edge": -1.0, "arrival_speed": 0.0, "feet_clearance": 0.5}
+  },
+  "updates": 100000, "max_hours": 6, "validation_seed": 100, "evaluation_trials": 8, "evaluation_levels": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "rollout_steps": 24, "epochs": 5, "minibatches": 4,
+  "learning_rate": 0.001, "desired_kl": 0.01, "gamma": 0.99, "gae_lambda": 0.95,
+  "entropy": 0.001, "hidden": [512, 256, 128],
+  "checkpoint_every": 25, "evaluation_every": 25,
+  "output": "runs/kth-variant-5-edge-clearance-6h"
+}

@@ -80,3 +80,16 @@ v3 from scratch is worse than v2 on every test (pile-scene hops 31% vs 86%), so 
 Variants 1-4 ran for 2 hours each on Tanmay's GPU; variant 3 (noise 0.5 + edge penalty) is the best so far (94% of pile-scene hops on box ground against v2's 86%). Variants 5 and 8 now continue from variant 1's 49-point network for 6 hours with 8192 robots per run, four tile variants and a 640-robot validation set (round 2 in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md)).
 
 Round 1 variants 5-8 ran for 2 hours each on Amedeo's GPU (H100 MIG 2g.20gb, four at once). Neither fine-tune beats v2 or variant 3: variants 6 and 7 arrive on 81% of box-ground hops (v2 86%, variant 3 94%) and 50-51% on the heightfield (v2 72%), falling less but timing out more. Variants 5 and 8 (from scratch, about 950 updates) arrive on no pile-scene hops, like variant 1. The KTH server and the laptop agree within 1 point on the hop tables. Results, charts and data for comparing with variants 1-4: [variants_5-8](outputs/comparison/variants_5-8/README.md).
+
+## October 22, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Train variants 5 and 8 for 6 hours from variant 1 (continued from October 21) | Tanmay | [X] | 6 h GPU runs (elapsed) |
+| Fix the planner loop on pile scenes: 0.20 m pile arrival, hops judged from the pile centre, no bounce-back | Tanmay | [X] | Not recorded |
+| Evaluate variants 5 and 8 on the larger test set against v2, variant 1 and variant 3 | Tanmay | [X] | Not recorded |
+| Foot-clearance reward (Lab 1 C) and the round 3 config: variant 5 + edge penalty + foot clearance | Tanmay | [X] | Not recorded |
+| Train variant 9 (variant 5 + edge penalty + foot clearance) for 6 hours | Tanmay | [ ] | — |
+| Train two runs from scratch for 6 hours on Amedeo's KTH GPU, both with the 49-point foot scan and variant 3's settings: A with variant 3's rewards, B with re-weighted rewards | Amedeo | [ ] | — |
+
+Planner loop: a robot standing on the seam between two piles counted as arriving at both (0.25 m arrival circle against 0.23 m half spacing on row 5), so the optimistic planner bounced between them. With the fix, variant 3 reaches the goal on 6 of 10 test scenes instead of 1 (open rows 3/5/7, holes, rough, slanted, moat, dead end); the remaining failures are falls. Hop tables are measured as before (`observe_pose(snap=False)`).
