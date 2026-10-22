@@ -627,6 +627,23 @@ setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-varian
     --resume runs/kth-variant-5-6h-from-1/last.pt > runs/kth-variant-5-edge-clearance-6h.log 2>&1 < /dev/null &
 ```
 
+The server stopped after 5.0 hours (update 9,222). The run resumed from `last.pt`
+(update 9,200) with `max_hours` 0.98 and ended at update 10,176.
+
+### Variant 9 results (October 22, same larger test set as round 2)
+
+| | Box-ground hops | Heightfield hops | Falls (box) | Fixed test, regular / noise 1.0 | Fixed test, piles | Robots that fell |
+| --- | --- | --- | --- | --- | --- | --- |
+| v2 | 86% | 71% | 10% | 79% / 76% | 27% | 20% |
+| variant 3 | 94% | 75% | 6% | 82% / 80% | 36% | 13% |
+| variant 5 | 73% | 56% | 26% | 83% / 82% | 37% | 13% |
+| **variant 9** | **96%** | **81%** | **4%** | **88% / 86%** | **49%** | **10%** |
+
+- The two rewards turned variant 5's pile falls (26% of box-ground hops) into 4%, and
+  variant 9 beats variant 3 on both grounds.
+- Its fixed-test success is the highest on every level.
+- Charts: `outputs/comparison_round3/` on Tanmay's laptop.
+
 ## Controller family tree
 
 An arrow means "continues training from" (`--resume`: same weights, normalizer, optimizer
@@ -642,7 +659,7 @@ flowchart TD
     V1C["v1 control · 3001–4000<br/>same 7 types, no piles<br/>control run for v2"]
     V2["v2 · 3001–4000<br/>adds pile tiles: 8th type, 0.5 m pits<br/>40% of robots on piles<br/>box hops 86%"]
     VA2["variant 2 · 4001–4923 · 2 h<br/>noise ramp: regular on level 0,<br/>noise 1.0 from level 4<br/>box hops 86%"]
-    VA3["variant 3 · 4001–4916 · 2 h<br/>noise 0.5, edge −1, gap −20,<br/>arrival speed −5<br/>box hops 94%, best on piles"]
+    VA3["variant 3 · 4001–4916 · 2 h<br/>noise 0.5, edge −1, gap −20,<br/>arrival speed −5<br/>box hops 94%, best of the old scan"]
     VA4["variant 4 · 4001–4940 · 2 h<br/>relaxed curriculum<br/>box hops 84%, many timeouts"]
     V1 --> V1C
     V1 --> V2
@@ -658,17 +675,15 @@ flowchart TD
     VA1["variant 1 · 1–945 · 2 h<br/>from scratch, 49-point foot scan,<br/>original rewards<br/>box hops 0%"]
     VA5["variant 5 · 946–4234 · 6 h<br/>noise ramp, 8192 robots,<br/>4 tile variants, entropy 0.001<br/>box hops 73%, best general test"]
     VA8["variant 8 · 946–4299 · 6 h<br/>relaxed curriculum, 8192 robots<br/>box hops 57%, many timeouts"]
-    VA9["variant 9 · from 4235 · 6 h<br/>variant 5 + edge −1<br/>+ foot clearance 0.5 (Lab 1 C)<br/>in progress"]
+    VA9["variant 9 · 4235–10176 · 6 h<br/>variant 5 + edge −1<br/>+ foot clearance 0.5 (Lab 1 C)<br/>box hops 96%, best overall"]
     VA1 --> VA5
     VA1 --> VA8
     VA5 --> VA9
   end
   classDef best fill:#E1F5EE,stroke:#0F6E56,color:#085041
   classDef weak fill:#F1EFE8,stroke:#888780,color:#444441
-  classDef running fill:#EEEDFE,stroke:#534AB7,color:#3C3489,stroke-dasharray:5 4
-  class VA3,VA5 best
+  class VA3,VA5,VA9 best
   class V3,VA1 weak
-  class VA9 running
 ```
 
 | Controller | Starts from | What changed for its training | Box hops |
@@ -683,7 +698,7 @@ flowchart TD
 | variant 4 | v2 | relaxed curriculum: promote at 60% of targets, demote only without progress | 84% |
 | variant 5 | variant 1 | noise ramp, 6 h, 8,192 robots, 4 tile variants, 640-robot validation, entropy 0.001 | 73% |
 | variant 8 | variant 1 | relaxed curriculum, otherwise as variant 5 | 57% |
-| variant 9 | variant 5 | edge penalty -1 and foot clearance 0.5 (Lab 1 C), otherwise as variant 5 | in progress |
+| variant 9 | variant 5 | edge penalty -1 and foot clearance 0.5 (Lab 1 C), otherwise as variant 5 | 96% |
 
 Configs written but not run: `kth-controller-v3-from-v2`, `kth-controller-v4-from-v2`,
 `kth-controller-v2-continued`, `kth-variant-0-control`, `kth-variant-0-scratch-v1-scan`,
