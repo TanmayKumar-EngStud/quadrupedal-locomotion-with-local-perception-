@@ -77,3 +77,12 @@ The guide is [TRAINING_NEXT_RUNS.md](docs/TRAINING_NEXT_RUNS.md).
 v3 from scratch is worse than v2 on every test (pile-scene hops 31% vs 86%), so the next runs start from v2. The eight variants, their configs, and the launch and evaluation steps are in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md); watch.py and play.py now draw the terrain samples each controller senses. Validated with unit tests (74 pass) and a 2-update CPU run of every variant config; not yet run on the GPU.
 
 Variants 1-4 ran for 2 hours each on Tanmay's GPU; variant 3 (noise 0.5 + edge penalty) is the best so far (94% of pile-scene hops on box ground against v2's 86%). Variants 5 and 8 now continue from variant 1's 49-point network for 6 hours with 8192 robots per run, four tile variants and a 640-robot validation set (round 2 in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md)).
+
+## October 22, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Train variants 5 and 8 for 6 hours from variant 1 (continued from October 21) | Tanmay | [ ] | — |
+| Fix the planner loop on pile scenes: 0.20 m pile arrival, hops judged from the pile centre, no bounce-back | Tanmay | [X] | Not recorded |
+
+Planner loop: a robot standing on the seam between two piles counted as arriving at both (0.25 m arrival circle against 0.23 m half spacing on row 5), so the optimistic planner bounced between them. With the fix, variant 3 reaches the goal on 6 of 10 test scenes instead of 1 (open rows 3/5/7, holes, rough, slanted, moat, dead end); the remaining failures are falls. Hop tables are measured as before (`observe_pose(snap=False)`).

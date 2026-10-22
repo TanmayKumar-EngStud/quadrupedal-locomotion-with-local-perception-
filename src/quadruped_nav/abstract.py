@@ -267,14 +267,21 @@ def local_normal(pile,yaw):
     return float(c*n[0]+s*n[1]),float(-s*n[0]+c*n[1]),float(n[2])
 
 
-def observe_pose(terrain,limits,position,yaw,decision_index=0,time_s=0):
-    """Planner observation at the actual continuous physics pose (not snapped)."""
+def observe_pose(terrain,limits,position,yaw,decision_index=0,time_s=0,snap=False):
+    """Planner observation at the actual continuous physics pose.
+
+    snap=False judges every hop from that pose (calibration's hop tables). snap=True
+    judges it from the centre of the support the robot stands on, as the abstract
+    model and the oracle do: a robot standing on the seam between two rows of piles
+    otherwise has one line of feet along the gap for every hop ahead, and only the
+    piles beside it remain allowed.
+    """
     x,y,z=map(float,position);c,s=math.cos(yaw),math.sin(yaw)
     support=min(terrain.piles,key=lambda p:math.hypot(p.x-x,p.y-y))
-    current=Pile(support.id,x,y,support.z,support.size,support.roll,support.pitch)
+    current=support if snap else Pile(support.id,x,y,support.z,support.size,support.roll,support.pitch)
     visible=tuple(sorted((p for p in terrain.piles if math.hypot(p.x-x,p.y-y)<=limits.observation_radius_m+1e-9),key=lambda p:p.id))
     def local(px,py):return c*(px-x)+s*(py-y),-s*(px-x)+c*(py-y)
-    candidates=tuple(math.hypot(p.x-x,p.y-y)>.25 and math.hypot(p.x-x,p.y-y)<=limits.max_subgoal_m and
+    candidates=tuple(p.id!=support.id and math.hypot(p.x-x,p.y-y)>.25 and math.hypot(p.x-x,p.y-y)<=limits.max_subgoal_m and
                      straight_approach(current,p,visible,limits) for p in visible)
     goal=next(p for p in terrain.piles if p.id==terrain.goal_id)
     return Observation(decision_index,time_s,support.id,(x,y,z),yaw,local(goal.x,goal.y),limits.observation_radius_m,

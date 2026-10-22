@@ -400,6 +400,23 @@ def test_learned_planner_masks_and_memory_reset(variant):
     planner.reset(); assert not planner.visits and planner.hidden is None
 
 
+def test_hops_judged_from_the_pile_centre_and_no_bounce_back():
+    from quadruped_nav.abstract import Limits, observe_pose
+    from quadruped_nav.evaluate import without_backtrack
+    terrain = Terrain.from_scene(generate_terrain('open', 5, 10000)); limits = Limits()
+    piles = {(round(p.x, 2), round(p.y, 2)): p.id for p in terrain.piles}
+    seam = (1.17, -0.29, .3)                               # on the gap between two rows of piles
+    allowed = lambda obs: {p.id for p, ok in zip(obs.visible_piles, obs.action_mask) if ok}
+    ahead = piles[1.83, -0.46]
+    assert ahead not in allowed(observe_pose(terrain, limits, seam, 0.))        # one line of feet along the gap
+    centred = observe_pose(terrain, limits, seam, 0., snap=True)
+    assert ahead in allowed(centred) and centred.current_pile_id not in allowed(centred)
+    back = piles[0.91, -0.46]
+    assert back in allowed(centred) and back not in allowed(without_backtrack(centred, back))
+    only = replace(centred, action_mask=tuple(p.id == back for p in centred.visible_piles))
+    assert allowed(without_backtrack(only, back)) == {back}   # still allowed when nothing else is
+
+
 def test_optimistic_escapes_and_resets():
     planner = OptimisticPlanner()
     env = AbstractEnv(Terrain.from_scene(generate_scene('dead_end')))
