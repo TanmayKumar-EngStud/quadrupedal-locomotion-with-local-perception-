@@ -110,7 +110,8 @@ it: the tile is built from the options above.)
 | `--no-scan` | hide the terrain samples |
 
 In the window, the red sphere inside a pale circle is the current subgoal and its
-0.20 m arrival circle; blue spheres are earlier subgoals.
+0.20 m arrival circle; blue spheres are earlier subgoals. The terminal prints every
+planner decision (time, pile position, hop length, reason).
 
 Since October 22 the planner loop:
 - counts a pile as reached only within 0.20 m of its centre;
@@ -120,8 +121,7 @@ Since October 22 the planner loop:
 
 Before, a robot on the seam between two piles "reached" both, and the planner
 bounced between them (variant 3: 1 of 10 test scenes reached the goal before the
-fix, 6 of 10 after). Calibration's hop tables are measured as before. The terminal prints every
-planner decision (time, pile position, hop length, reason).
+fix, 6 of 10 after). Calibration's hop tables are measured as before.
 
 ### v3 on every layout family
 
