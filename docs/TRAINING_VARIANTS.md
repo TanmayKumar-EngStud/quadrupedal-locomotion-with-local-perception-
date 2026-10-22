@@ -594,13 +594,16 @@ The larger test set: fixed test with 1,280 robots per noise level, and hop table
 
 Charts: `outputs/comparison_round2/` on Tanmay's laptop.
 
-## Round 3: variant 5 with the edge penalty and foot clearance (6 hours)
+## Variant 9 (round 3): variant 5 with the edge penalty and foot clearance (6 hours)
 
-`configs/kth-variant-5-edge-clearance-6h.json` resumes from
+Variant 9's files keep the name they were launched with: config
+`configs/kth-variant-5-edge-clearance-6h.json`, run folder
+`runs/kth-variant-5-edge-clearance-6h`, bundle `artifacts/variant_5-edge-clearance`.
+The config resumes from
 `runs/kth-variant-5-6h-from-1/last.pt` (update 4234). It is round 2's variant 5
 config with only the rewards changed:
 
-| Reward | Round 2 | Round 3 | What it does |
+| Reward | Variant 5 | Variant 9 | What it does |
 | --- | --- | --- | --- |
 | `feet_edge` | 0 | -1 | penalises each standing foot with a drop deeper than 5 cm within 5 cm (as variant 3) |
 | `feet_clearance` | 0 | 0.5 | Lab 1 C's foot clearance (`perceptive_go1.py`), see below |
@@ -626,31 +629,61 @@ setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-varian
 
 ## Controller family tree
 
-Each indented controller continues training from the one above it (`--resume`: same
-weights, normalizer, optimizer and update counter). Update numbers are cumulative.
+An arrow means "continues training from" (`--resume`: same weights, normalizer, optimizer
+and update counter), so update numbers are cumulative along each path. The two scan
+families cannot be mixed: their networks have different input sizes. Box-ground hop
+success is from the hop tables on the pile scenes, rows 0-9, under the current hop rule.
 
+```mermaid
+flowchart TD
+  subgraph OLD["Old terrain scan: 106 samples, 161 inputs"]
+    direction TB
+    V1["v1 · updates 1–3000<br/>from scratch, 7 terrain types<br/>3 phases, pit-depth curriculum from 400<br/>box hops 42%"]
+    V1C["v1 control · 3001–4000<br/>same 7 types, no piles<br/>control run for v2"]
+    V2["v2 · 3001–4000<br/>adds pile tiles: 8th type, 0.5 m pits<br/>40% of robots on piles<br/>box hops 86%"]
+    VA2["variant 2 · 4001–4923 · 2 h<br/>noise ramp: regular on level 0,<br/>noise 1.0 from level 4<br/>box hops 86%"]
+    VA3["variant 3 · 4001–4916 · 2 h<br/>noise 0.5, edge −1, gap −20,<br/>arrival speed −5<br/>box hops 94%, best on piles"]
+    VA4["variant 4 · 4001–4940 · 2 h<br/>relaxed curriculum<br/>box hops 84%, many timeouts"]
+    V1 --> V1C
+    V1 --> V2
+    V2 --> VA2
+    V2 --> VA3
+    V2 --> VA4
+  end
+  subgraph SCRATCH["Separate run from scratch"]
+    V3["v3 · 1–12724 · 8 h<br/>8 types, noise 0.5, shallow-pit ramp,<br/>gap and arrival-speed penalties<br/>box hops 31%"]
+  end
+  subgraph NEW["New terrain scan: 49 points per foot + 4 under the body, 255 inputs"]
+    direction TB
+    VA1["variant 1 · 1–945 · 2 h<br/>from scratch, 49-point foot scan,<br/>original rewards<br/>box hops 0%"]
+    VA5["variant 5 · 946–4234 · 6 h<br/>noise ramp, 8192 robots,<br/>4 tile variants, entropy 0.001<br/>box hops 73%, best general test"]
+    VA8["variant 8 · 946–4299 · 6 h<br/>relaxed curriculum, 8192 robots<br/>box hops 57%, many timeouts"]
+    VA9["variant 9 · from 4235 · 6 h<br/>variant 5 + edge −1<br/>+ foot clearance 0.5 (Lab 1 C)<br/>in progress"]
+    VA1 --> VA5
+    VA1 --> VA8
+    VA5 --> VA9
+  end
+  classDef best fill:#E1F5EE,stroke:#0F6E56,color:#085041
+  classDef weak fill:#F1EFE8,stroke:#888780,color:#444441
+  classDef running fill:#EEEDFE,stroke:#534AB7,color:#3C3489,stroke-dasharray:5 4
+  class VA3,VA5 best
+  class V3,VA1 weak
+  class VA9 running
 ```
-OLD SCAN (106 terrain samples, 161 inputs)
-from scratch, 7 terrain types
-└─ v1 phase 1            updates     1-400    runs/kth-goal-v3-seed0
-   └─ v1 phase 2         updates   401-750    pit-depth curriculum
-      └─ v1 phase 3      updates   751-3000   = v1 (artifacts/controller_v1)
-         ├─ v1 control   updates  3001-4000   7 types, no piles (control for v2)
-         └─ v2           updates  3001-4000   + pile tiles, 8 types (artifacts/controller_v2)
-            ├─ variant 2 updates  4001-4923   2 h, noise ramp
-            ├─ variant 3 updates  4001-4916   2 h, noise 0.5 + edge penalty + arrival-speed -5   <- best on piles
-            └─ variant 4 updates  4001-4940   2 h, relaxed curriculum
 
-from scratch, 8 terrain types, noise 0.5
-└─ v3                    updates     1-12724  8 h (worse than v2 on every test)
-
-NEW SCAN ("feet49": 200 terrain samples, 255 inputs)
-from scratch, 8 terrain types
-└─ variant 1             updates     1-945    2 h
-   ├─ variant 5          updates   946-4234   6 h, 8192 robots, noise ramp      <- best on the general test
-   │  └─ variant 5 + edge penalty + foot clearance   updates 4235-   6 h (round 3)
-   └─ variant 8          updates   946-4299   6 h, 8192 robots, relaxed curriculum
-```
+| Controller | Starts from | What changed for its training | Box hops |
+| --- | --- | --- | --- |
+| v1 | scratch | 7 terrain types (rough, slope, stairs up and down, obstacles, stepping stones, gaps), old 106-sample scan; 3 phases, a pit-depth curriculum from update 400 | 42% |
+| v1 control | v1 | 1,000 more updates on the same 7 types, no piles: the control for v2 | |
+| v2 | v1 | an 8th terrain type, piles over 0.5 m pits, with 40% of robots on it | 86% |
+| v3 | scratch | 8 types, irregular terrain (noise 0.5), pits deepening with level, gap and arrival-speed penalties, 8 h | 31% |
+| variant 1 | scratch | the new 49-point foot scan (200 samples, 255 inputs), original rewards, 2 h | 0% |
+| variant 2 | v2 | noise ramp: regular level 0, irregularities growing to noise 1.0 by level 4; robots start on levels 0-2 | 86% |
+| variant 3 | v2 | noise 0.5 everywhere, edge penalty -1, gap penalty -20, arrival-speed penalty -5 | 94% |
+| variant 4 | v2 | relaxed curriculum: promote at 60% of targets, demote only without progress | 84% |
+| variant 5 | variant 1 | noise ramp, 6 h, 8,192 robots, 4 tile variants, 640-robot validation, entropy 0.001 | 73% |
+| variant 8 | variant 1 | relaxed curriculum, otherwise as variant 5 | 57% |
+| variant 9 | variant 5 | edge penalty -1 and foot clearance 0.5 (Lab 1 C), otherwise as variant 5 | in progress |
 
 Configs written but not run: `kth-controller-v3-from-v2`, `kth-controller-v4-from-v2`,
 `kth-controller-v2-continued`, `kth-variant-0-control`, `kth-variant-0-scratch-v1-scan`,

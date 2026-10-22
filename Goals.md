@@ -86,6 +86,6 @@ Variants 1-4 ran for 2 hours each on Tanmay's GPU; variant 3 (noise 0.5 + edge p
 | Fix the planner loop on pile scenes: 0.20 m pile arrival, hops judged from the pile centre, no bounce-back | Tanmay | [X] | Not recorded |
 | Evaluate variants 5 and 8 on the larger test set against v2, variant 1 and variant 3 | Tanmay | [X] | Not recorded |
 | Foot-clearance reward (Lab 1 C) and the round 3 config: variant 5 + edge penalty + foot clearance | Tanmay | [X] | Not recorded |
-| Train variant 5 + edge penalty + foot clearance for 6 hours | Tanmay | [ ] | — |
+| Train variant 9 (variant 5 + edge penalty + foot clearance) for 6 hours | Tanmay | [ ] | — |
 
 Planner loop: a robot standing on the seam between two piles counted as arriving at both (0.25 m arrival circle against 0.23 m half spacing on row 5), so the optimistic planner bounced between them. With the fix, variant 3 reaches the goal on 6 of 10 test scenes instead of 1 (open rows 3/5/7, holes, rough, slanted, moat, dead end); the remaining failures are falls. Hop tables are measured as before (`observe_pose(snap=False)`).
