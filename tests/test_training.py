@@ -237,6 +237,19 @@ def test_feet_edge_penalty_marks_supported_feet_near_a_drop():
     assert float(info['reward_terms']['feet_edge'].abs().max()) == 0.       # level ground has no edges
 
 
+def test_feet_clearance_pays_the_swing_height_on_touchdown():
+    state = SimpleNamespace(touchdown=torch.tensor([[True, True, False, True]]), moving=torch.tensor([True]),
+                            air_time_on_touchdown=torch.tensor([[.3, .05, .3, .3]]), swing_peak=torch.tensor([[.05, .2, .2, .2]]))
+    # 5 cm of a 10 cm target; a swing too short to count; no touchdown; capped at 1
+    assert float(rewards._reward_feet_clearance(state, default_reward_params())) == pytest.approx(1.5)
+    env = GoalEnv(small_config(num_envs=2, terrain_types=['rough'], rewards={'feet_clearance': .5}))
+    paid, generator = 0., torch.Generator().manual_seed(0)
+    for _ in range(60):
+        _, _, _, _, info = env.step(torch.randn(2, 12, generator=generator))
+        paid += float(info['reward_terms']['feet_clearance'].sum())
+    assert paid > 0 and (env.swing_peak >= 0).all()                  # stepping feet earn it; peaks reset on touchdown
+
+
 def test_run_configs_change_only_the_reward_values_they_list():
     cfg = EnvConfig(rewards={'feet_in_gap': -20.}, reward_params={'gap_deadband': .05})
     assert cfg.rewards == {**default_rewards(), 'feet_in_gap': -20.}

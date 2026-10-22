@@ -135,6 +135,7 @@ class GoalEnv:
         self.previous_feet = zeros(4, 3)
         self.previous_joint_vel = zeros(12)
         self.air_time = zeros(4)
+        self.swing_peak = zeros(4)          # highest foot point above the terrain during the current swing
         self.last_contact = zeros(4, dtype=torch.bool)
         self.episode_arrivals = zeros()
         self.episode_misses = zeros()
@@ -260,7 +261,7 @@ class GoalEnv:
             yaw = (self.rand(count) - .5) * .8
         q[:, 3], q[:, 4:6], q[:, 6] = torch.cos(yaw / 2), 0, torch.sin(yaw / 2)
         self.backend.reset(ids, q)
-        for buffer in (self.elapsed, self.previous_action, self.previous_joint_vel, self.air_time,
+        for buffer in (self.elapsed, self.previous_action, self.previous_joint_vel, self.air_time, self.swing_peak,
                        self.episode_arrivals, self.episode_misses, self.episode_progress):
             buffer[ids] = 0
         self.last_contact[ids] = True
@@ -374,6 +375,10 @@ class GoalEnv:
         self.air_time *= ~(contact | self.last_contact)
         self.last_contact = contact
         foot_velocity = (k.feet - self.previous_feet) / dt
+        # Swing height as in Lab 1 C: foot centre above the terrain below it, the highest while in the air.
+        self.swing_peak = torch.where(contact, self.swing_peak, torch.maximum(self.swing_peak, k.foot_height + FOOT_RADIUS))
+        swing_peak = self.swing_peak.clone()
+        self.swing_peak *= ~touchdown
 
         # Outcomes.
         nearby = self.terrain.sample(yaw_frame_points(k.pos[:, :2], k.yaw, self.clearance_scan)).amax(-1)
@@ -397,7 +402,7 @@ class GoalEnv:
             lin_vel_body=k.lin_vel_body, lin_vel_world=k.lin_vel_world, ang_vel_body=k.ang_vel_body,
             gravity_body=k.gravity_body, command=self._command(distance, local), target_direction=direction,
             max_speed=self.max_speed, moving=moving, touchdown=touchdown, air_time_on_touchdown=air_time_on_touchdown,
-            foot_velocity=foot_velocity, contact=contact, knee_height=k.knee_height, joint_pos=k.joint_pos,
+            foot_velocity=foot_velocity, contact=contact, swing_peak=swing_peak, knee_height=k.knee_height, joint_pos=k.joint_pos,
             home_joints=self.home_joints, torques=torch.nan_to_num(self.backend.tensor('qfrc_actuator')[:, 6:]),
             joint_acc=(k.joint_vel - self.previous_joint_vel) / dt, action=action, previous_action=self.previous_action,
             soft_low=self.soft_low, soft_high=self.soft_high, newly_arrived=newly_arrived, fall=fall,

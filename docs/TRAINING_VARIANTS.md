@@ -574,6 +574,89 @@ level, all 10 levels, on four tile variants:
 Run v2, variant 1 and variant 3 through the same tests, so all of them are compared on
 the same larger test set.
 
+### Round 2 results (October 22)
+
+The larger test set: fixed test with 1,280 robots per noise level, and hop tables with
+48 episodes per family and row. Variant 5 ended at update 4,234, variant 8 at 4,299.
+
+| | Box-ground hops | Heightfield hops | Fixed test, regular / noise 1.0 | Robots that fell (regular) |
+| --- | --- | --- | --- | --- |
+| v2 | 86% | 71% | 79% / 76% | 20% |
+| variant 1 | 0% | 0% | 52% / 49% | 19% |
+| variant 3 | **94%** | **75%** | 82% / 80% | 13% |
+| variant 5 | 73% (26% falls) | 56% | **83% / 82%** | 13% |
+| variant 8 | 57% (34% timeouts) | 38% | 78% / 77% | **9%** |
+
+- Variant 5 matches variant 3 on the general fixed test, but on the pile scenes it
+  still falls between narrow piles (18% of hops at row 9, against 79% for variant 3).
+- Variant 8's relaxed curriculum made it slow, as variant 4's did: many of its hops
+  time out.
+
+Charts: `outputs/comparison_round2/` on Tanmay's laptop.
+
+## Round 3: variant 5 with the edge penalty and foot clearance (6 hours)
+
+`configs/kth-variant-5-edge-clearance-6h.json` resumes from
+`runs/kth-variant-5-6h-from-1/last.pt` (update 4234). It is round 2's variant 5
+config with only the rewards changed:
+
+| Reward | Round 2 | Round 3 | What it does |
+| --- | --- | --- | --- |
+| `feet_edge` | 0 | -1 | penalises each standing foot with a drop deeper than 5 cm within 5 cm (as variant 3) |
+| `feet_clearance` | 0 | 0.5 | Lab 1 C's foot clearance (`perceptive_go1.py`), see below |
+
+**Foot clearance** (`_reward_feet_clearance` in `rl/rewards.py`, swing bookkeeping in
+`GoalEnv.step`):
+- During each swing, the foot centre's highest point above the terrain below it is
+  tracked.
+- At touchdown, if the swing lasted at least 0.08 s, the reward pays
+  min(peak / 0.10 m, 1) per foot, and only while the robot is walking to a target.
+  The peak is then reset.
+- Lab 1 C weighted it 0.1 against a tracking weight of 1.0. Here tracking is
+  weighted 1.5, and the other touchdown reward (`feet_air_time`) 0.5, so the run
+  uses 0.5.
+
+The aim is to lift the feet clear of pile edges, together with the edge penalty, and
+so cut variant 5's falls between narrow piles.
+
+```sh
+setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-variant-5-edge-clearance-6h.json \
+    --resume runs/kth-variant-5-6h-from-1/last.pt > runs/kth-variant-5-edge-clearance-6h.log 2>&1 < /dev/null &
+```
+
+## Controller family tree
+
+Each indented controller continues training from the one above it (`--resume`: same
+weights, normalizer, optimizer and update counter). Update numbers are cumulative.
+
+```
+OLD SCAN (106 terrain samples, 161 inputs)
+from scratch, 7 terrain types
+└─ v1 phase 1            updates     1-400    runs/kth-goal-v3-seed0
+   └─ v1 phase 2         updates   401-750    pit-depth curriculum
+      └─ v1 phase 3      updates   751-3000   = v1 (artifacts/controller_v1)
+         ├─ v1 control   updates  3001-4000   7 types, no piles (control for v2)
+         └─ v2           updates  3001-4000   + pile tiles, 8 types (artifacts/controller_v2)
+            ├─ variant 2 updates  4001-4923   2 h, noise ramp
+            ├─ variant 3 updates  4001-4916   2 h, noise 0.5 + edge penalty + arrival-speed -5   <- best on piles
+            └─ variant 4 updates  4001-4940   2 h, relaxed curriculum
+
+from scratch, 8 terrain types, noise 0.5
+└─ v3                    updates     1-12724  8 h (worse than v2 on every test)
+
+NEW SCAN ("feet49": 200 terrain samples, 255 inputs)
+from scratch, 8 terrain types
+└─ variant 1             updates     1-945    2 h
+   ├─ variant 5          updates   946-4234   6 h, 8192 robots, noise ramp      <- best on the general test
+   │  └─ variant 5 + edge penalty + foot clearance   updates 4235-   6 h (round 3)
+   └─ variant 8          updates   946-4299   6 h, 8192 robots, relaxed curriculum
+```
+
+Configs written but not run: `kth-controller-v3-from-v2`, `kth-controller-v4-from-v2`,
+`kth-controller-v2-continued`, `kth-variant-0-control`, `kth-variant-0-scratch-v1-scan`,
+and round 1's 2-hour variants 5-8 for Amedeo's GPU. Variants 5 and 8 were trained in
+round 2 instead, from variant 1.
+
 ## Implementation reference
 
 | Setting (`env` block) | Values | Code | Test (`tests/test_training.py`) |
@@ -582,6 +665,7 @@ the same larger test set.
 | `terrain_noise_ramp` | 0 (default), L > 0 | `TerrainGrid.level_noise()` in `rl/terrain_grid.py` | `test_noise_ramp_grows_the_irregularities_with_the_level` |
 | `curriculum_rule` | `strict` (default), `relaxed` | `GoalEnv._update_levels()`, `episode_progress` | `test_relaxed_curriculum_promotes_at_60_percent_and_demotes_only_without_progress` |
 | `evaluation_trials`, `evaluation_levels` (top level) | 4, None (levels 0/3/6/9) | `train.py` passes them to `TerrainEvaluator`; `goal_check --trials --levels` for tests | `test_validation_size_follows_the_config` |
+| `rewards.feet_clearance`, `reward_params.clearance_target`, `clearance_min_air_time` | 0 (off), 0.10 m, 0.08 s | `_reward_feet_clearance()` in `rl/rewards.py`, `GoalEnv.swing_peak` | `test_feet_clearance_pays_the_swing_height_on_touchdown` |
 | `rewards.feet_edge`, `reward_params.edge_drop` | 0 (off), 0.05 m | `_reward_feet_edge()` in `rl/rewards.py`, `GoalEnv._edge_drop()` | `test_feet_edge_penalty_marks_supported_feet_near_a_drop` |
 | viewer markers | on, `--no-scan` | `src/quadruped_nav/markers.py`, `watch.py`, `evaluate.py` (play.py) | |
 
