@@ -1,0 +1,26 @@
+{
+  "env": {
+    "num_envs": 8192, "backend": "warp", "device": "cuda:0", "seed": 0,
+    "terrain_types": ["rough", "slope", "stairs_up", "stairs_down", "obstacles", "stepping_stones", "gaps", "piles"],
+    "terrain_weights": [8, 8, 14, 10, 8, 15, 12, 25],
+    "terrain_resolution": 0.05, "fine_terrain_resolution": 0.025, "terrain_levels": 10,
+    "terrain_noise": 0.5, "terrain_noise_ramp": 0, "terrain_variants": 4, "pile_pit_ramp": false, "max_start_level": 2, "target_distance": [0.4, 3.0], "curriculum_rule": "strict", "scan_layout": "feet49",
+    "rewards": {
+      "alive": 1.0, "tracking_lin_vel": 1.5, "tracking_ang_vel": 0.75, "goal_progress": 0.5, "arrival": 10.0,
+      "lin_vel_z": -2.0, "ang_vel_xy": -0.05, "orientation": -0.5,
+      "feet_air_time": 0.5, "feet_slip": -0.1, "knee_collision": -1.0, "stand_still": -0.5, "feet_clearance": 0.0,
+      "torques": -1e-4, "dof_acc": -2.5e-7, "action_rate": -0.01,
+      "dof_pos_limits": -10.0, "feet_in_gap": -20.0, "feet_edge": -1.0, "fall": -10.0, "arrival_speed": -5.0
+    },
+    "reward_params": {
+      "tracking_sigma": 0.25, "air_time_target": 0.25, "knee_clearance": 0.04, "arrival_speed_limit": 0.5,
+      "gap_deadband": 0.03, "gap_cap": 0.10, "edge_drop": 0.05, "clearance_target": 0.10, "clearance_min_air_time": 0.08
+    }
+  },
+  "updates": 100000, "max_hours": 6, "validation_seed": 100, "evaluation_trials": 8, "evaluation_levels": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "rollout_steps": 24, "epochs": 5, "minibatches": 4,
+  "learning_rate": 0.001, "desired_kl": 0.01, "gamma": 0.99, "gae_lambda": 0.95,
+  "entropy": 0.001, "hidden": [512, 256, 128],
+  "checkpoint_every": 25, "evaluation_every": 25,
+  "output": "runs/kth-amedeo-a-feet49-variant3-rewards-6h"
+}
