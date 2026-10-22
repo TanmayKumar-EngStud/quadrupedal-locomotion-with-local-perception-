@@ -54,6 +54,7 @@ def reward_config():
             feet_slip=-0.1,          # Penalise feet sliding while in contact.
             knee_collision=-1.0,     # Penalise knees closer than knee_clearance to the terrain.
             stand_still=-0.5,        # Penalise joint deviation from the standing pose while holding at a target.
+            feet_clearance=0.0,      # Reward lifting each foot during its swing, paid on touchdown (Lab 1 C). Off here; 0.5 in variant 5 round 3.
 
             # 4. Encourage smooth, efficient control.
             torques=-1e-4,           # Penalise large motor torques.
@@ -78,6 +79,8 @@ def reward_config():
                                          #  10-37 cm in the last second before 10 of 12 falls.)
             gap_cap=0.10,                # Metres; a foot deeper in a gap than this counts the same.
             edge_drop=0.05,              # Metres; a drop this deep within 5 cm of a standing foot makes it an edge.
+            clearance_target=0.10,       # Metres; feet_clearance saturates when a swing lifts the foot this high (Lab 1 C).
+            clearance_min_air_time=0.08, # Seconds; shorter swings (contact flicker) earn no feet_clearance (Lab 1 C).
         ),
     )
 
@@ -139,6 +142,13 @@ def _reward_orientation(s, p):
 def _reward_feet_air_time(s, p):
     """On touchdown, the swing time beyond air_time_target (negative for shorter swings)."""
     return ((s.air_time_on_touchdown - p['air_time_target']) * s.touchdown).sum(-1) * s.moving
+
+
+def _reward_feet_clearance(s, p):
+    """On touchdown after a swing of at least clearance_min_air_time, each foot's highest point above the terrain
+    during that swing as a share of clearance_target (at most 1), while moving (Lab 1 C's feet_clearance)."""
+    completed = s.touchdown & (s.air_time_on_touchdown >= p['clearance_min_air_time'])
+    return ((s.swing_peak / p['clearance_target']).clamp(0, 1) * completed).sum(-1) * s.moving
 
 
 def _reward_feet_slip(s, p):
