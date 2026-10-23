@@ -94,3 +94,13 @@ Round 1 variants 5-8 ran for 2 hours each on Amedeo's GPU (H100 MIG 2g.20gb, fou
 | Train two runs from scratch for 6 hours on Amedeo's KTH GPU, both with the 49-point foot scan and variant 3's settings: A with variant 3's rewards, B with re-weighted rewards | Amedeo | [X] | 6 h GPU runs (elapsed; B resumed once after running out of GPU memory) |
 
 Planner loop: a robot standing on the seam between two piles counted as arriving at both (0.25 m arrival circle against 0.23 m half spacing on row 5), so the optimistic planner bounced between them. With the fix, variant 3 reaches the goal on 6 of 10 test scenes instead of 1 (open rows 3/5/7, holes, rough, slanted, moat, dead end); the remaining failures are falls. Hop tables are measured as before (`observe_pose(snap=False)`).
+
+## October 23, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Evaluate runs A and B (step 8 and the larger test set) | Amedeo | [X] | 1 h evaluation (elapsed) |
+| Measure walking direction on the pile scenes; opt-in backward-walking penalty (`backward_motion`) | Amedeo | [X] | Not recorded |
+| Train runs C and D from scratch for 8 hours on Amedeo's KTH GPU: B's rewards with the backward penalty and foot clearance; C strict, D relaxed curriculum | Amedeo | [ ] | — |
+
+On the larger test set, B (re-weighted rewards) beats A (variant 3's rewards): 83% of box-ground hops against 71%, 64% against 42% on the heightfield, and 84% / 82% on the fixed test (regular / noise 1.0). Both 49-point-scan runs walk backwards about 70% of the time they move on the pile scenes (v2: 4%), because the velocity command and `goal_progress` do not depend on heading and the scan looks as far behind as ahead; their early falls happen while turning around at the start. `backward_motion` (off by default) charges backward body speed while walking to a target; C and D use -2.

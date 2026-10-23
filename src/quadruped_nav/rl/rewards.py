@@ -43,6 +43,7 @@ def reward_config():
             tracking_ang_vel=0.75,   # Match the commanded turning rate (turn to face the target).
             goal_progress=0.5,       # Velocity toward the target in m/s, capped at the commanded speed.
             arrival=10.0,            # EVENT: once for every target reached.
+            backward_motion=0.0,     # Penalise walking backwards (body-frame speed) toward a target. Off here; -2 in Amedeo's runs C and D.
 
             # 2. Keep the body controlled.
             lin_vel_z=-2.0,          # Penalise vertical bouncing.
@@ -120,6 +121,13 @@ def _reward_goal_progress(s, p):
 def _reward_arrival(s, p):
     """1 on the step a robot first comes within the arrival radius of its target."""
     return s.newly_arrived.float()
+
+
+def _reward_backward_motion(s, p):
+    """Backward body speed (m/s, body frame), 0 when walking forwards or holding at a target. The velocity command
+    and goal_progress do not depend on heading, so without this term 49-point-scan controllers walked backwards
+    about 70% of the time on the pile scenes."""
+    return (-s.lin_vel_body[:, 0]).clamp_min(0) * s.moving
 
 
 # 2. Keep the body controlled.
