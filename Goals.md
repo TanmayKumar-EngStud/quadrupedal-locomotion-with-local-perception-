@@ -89,7 +89,8 @@ Round 1 variants 5-8 ran for 2 hours each on Amedeo's GPU (H100 MIG 2g.20gb, fou
 | Fix the planner loop on pile scenes: 0.20 m pile arrival, hops judged from the pile centre, no bounce-back | Tanmay | [X] | Not recorded |
 | Evaluate variants 5 and 8 on the larger test set against v2, variant 1 and variant 3 | Tanmay | [X] | Not recorded |
 | Foot-clearance reward (Lab 1 C) and the round 3 config: variant 5 + edge penalty + foot clearance | Tanmay | [X] | Not recorded |
-| Train variant 9 (variant 5 + edge penalty + foot clearance) for 6 hours | Tanmay | [ ] | — |
-| Train two runs from scratch for 6 hours on Amedeo's KTH GPU, both with the 49-point foot scan and variant 3's settings: A with variant 3's rewards, B with re-weighted rewards | Amedeo | [ ] | — |
+| Train variant 9 (variant 5 + edge penalty + foot clearance) for 6 hours | Tanmay | [X] | 6 h GPU run (elapsed, resumed once after a server stop) |
+| Evaluate variant 9 on the larger test set against v2 and variants 1, 3, 5, 8 | Tanmay | [X] | Not recorded |
+| Train two runs from scratch for 6 hours on Amedeo's KTH GPU, both with the 49-point foot scan and variant 3's settings: A with variant 3's rewards, B with re-weighted rewards | Amedeo | [X] | 6 h GPU runs (elapsed; B resumed once after running out of GPU memory) |
 
 Planner loop: a robot standing on the seam between two piles counted as arriving at both (0.25 m arrival circle against 0.23 m half spacing on row 5), so the optimistic planner bounced between them. With the fix, variant 3 reaches the goal on 6 of 10 test scenes instead of 1 (open rows 3/5/7, holes, rough, slanted, moat, dead end); the remaining failures are falls. Hop tables are measured as before (`observe_pose(snap=False)`).
