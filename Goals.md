@@ -90,3 +90,12 @@ Variants 1-4 ran for 2 hours each on Tanmay's GPU; variant 3 (noise 0.5 + edge p
 | Evaluate variant 9 on the larger test set against v2 and variants 1, 3, 5, 8 | Tanmay | [X] | Not recorded |
 
 Planner loop: a robot standing on the seam between two piles counted as arriving at both (0.25 m arrival circle against 0.23 m half spacing on row 5), so the optimistic planner bounced between them. With the fix, variant 3 reaches the goal on 6 of 10 test scenes instead of 1 (open rows 3/5/7, holes, rough, slanted, moat, dead end); the remaining failures are falls. Hop tables are measured as before (`observe_pose(snap=False)`).
+
+## October 26, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Share the trained controllers in the repository (v1, v2, v3, variant 3, variant 9) | Tanmay | [X] | Not recorded |
+
+The controller bundles in `artifacts/` are now tracked (zips and the smoke-test bundle stay ignored); `artifacts/README.md` maps each folder to its name in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md). `controller_v5` holds variant 3.
+
