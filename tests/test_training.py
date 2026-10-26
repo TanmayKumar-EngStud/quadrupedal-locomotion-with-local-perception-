@@ -250,6 +250,17 @@ def test_feet_clearance_pays_the_swing_height_on_touchdown():
     assert paid > 0 and (env.swing_peak >= 0).all()                  # stepping feet earn it; peaks reset on touchdown
 
 
+def test_heading_alignment_rewards_walking_forwards():
+    state = SimpleNamespace(heading_cos=torch.tensor([1., -1., 0., 1., 1.]), speed_xy=torch.tensor([.8, .8, .8, .1, .8]),
+                            moving=torch.tensor([True, True, True, True, True]), target_far=torch.tensor([True, True, True, True, False]))
+    # forwards, backwards, sideways; too slow to count; close to the target (stepping back is free there)
+    assert torch.allclose(rewards._reward_heading_alignment(state, default_reward_params()), torch.tensor([1., -1., 0., 0., 0.]))
+    env = GoalEnv(small_config(num_envs=2, terrain_types=['rough'], rewards={'heading_alignment': .5}))
+    for _ in range(5):
+        _, _, _, _, info = env.step(torch.zeros(2, 12))
+    assert torch.isfinite(info['reward_terms']['heading_alignment']).all()
+
+
 def test_run_configs_change_only_the_reward_values_they_list():
     cfg = EnvConfig(rewards={'feet_in_gap': -20.}, reward_params={'gap_deadband': .05})
     assert cfg.rewards == {**default_rewards(), 'feet_in_gap': -20.}

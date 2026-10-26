@@ -407,6 +407,10 @@ class GoalEnv:
             joint_acc=(k.joint_vel - self.previous_joint_vel) / dt, action=action, previous_action=self.previous_action,
             soft_low=self.soft_low, soft_high=self.soft_high, newly_arrived=newly_arrived, fall=fall,
             speed_xy=torch.linalg.vector_norm(k.lin_vel_world[:, :2], dim=-1),
+            # Cosine between the heading (yaw) and the horizontal velocity: +1 forwards, -1 backwards.
+            heading_cos=(k.lin_vel_world[:, 0] * torch.cos(k.yaw) + k.lin_vel_world[:, 1] * torch.sin(k.yaw))
+                        / torch.linalg.vector_norm(k.lin_vel_world[:, :2], dim=-1).clamp_min(1e-3),
+            target_far=distance > cfg.slow_down_radius,
             # How far each foot's sole sits below the highest terrain within 4 cm: positive when it slips into a gap.
             foot_depth=self.terrain.sample(k.feet[:, :, None, :2] + self.gap_scan).amax(-1) - (k.feet[:, :, 2] - FOOT_RADIUS),
             edge_drop=self._edge_drop(k))
