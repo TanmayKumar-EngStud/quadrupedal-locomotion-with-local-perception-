@@ -1,0 +1,528 @@
+{
+  "format": "quadruped-controller/v3",
+  "observation_spec": {
+    "version": 3,
+    "actor_fields": [
+      [
+        "base_linear_velocity_body_x2",
+        3
+      ],
+      [
+        "base_angular_velocity_body_x0.25",
+        3
+      ],
+      [
+        "projected_gravity",
+        3
+      ],
+      [
+        "velocity_command_vx_vy_wz",
+        3
+      ],
+      [
+        "target_xy_body_clipped_3m",
+        2
+      ],
+      [
+        "target_distance_clipped_3m",
+        1
+      ],
+      [
+        "joint_position_minus_home",
+        12
+      ],
+      [
+        "joint_velocity_x0.05",
+        12
+      ],
+      [
+        "previous_action",
+        12
+      ],
+      [
+        "foot_contact",
+        4
+      ],
+      [
+        "body_scan_base_height_minus_0.3_minus_terrain",
+        70
+      ],
+      [
+        "foot_scan_foot_height_minus_terrain",
+        36
+      ]
+    ],
+    "critic_extra_fields": [
+      [
+        "base_height_above_terrain",
+        1
+      ],
+      [
+        "foot_height_above_terrain",
+        4
+      ],
+      [
+        "target_time_left_s",
+        1
+      ]
+    ],
+    "actor_dim": 161,
+    "critic_dim": 167,
+    "body_scan": [
+      [
+        -0.45,
+        -0.45
+      ],
+      [
+        -0.45,
+        -0.3
+      ],
+      [
+        -0.45,
+        -0.15
+      ],
+      [
+        -0.45,
+        0.0
+      ],
+      [
+        -0.45,
+        0.15
+      ],
+      [
+        -0.45,
+        0.3
+      ],
+      [
+        -0.45,
+        0.45
+      ],
+      [
+        -0.3,
+        -0.45
+      ],
+      [
+        -0.3,
+        -0.3
+      ],
+      [
+        -0.3,
+        -0.15
+      ],
+      [
+        -0.3,
+        0.0
+      ],
+      [
+        -0.3,
+        0.15
+      ],
+      [
+        -0.3,
+        0.3
+      ],
+      [
+        -0.3,
+        0.45
+      ],
+      [
+        -0.15,
+        -0.45
+      ],
+      [
+        -0.15,
+        -0.3
+      ],
+      [
+        -0.15,
+        -0.15
+      ],
+      [
+        -0.15,
+        0.0
+      ],
+      [
+        -0.15,
+        0.15
+      ],
+      [
+        -0.15,
+        0.3
+      ],
+      [
+        -0.15,
+        0.45
+      ],
+      [
+        0.0,
+        -0.45
+      ],
+      [
+        0.0,
+        -0.3
+      ],
+      [
+        0.0,
+        -0.15
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.15
+      ],
+      [
+        0.0,
+        0.3
+      ],
+      [
+        0.0,
+        0.45
+      ],
+      [
+        0.15,
+        -0.45
+      ],
+      [
+        0.15,
+        -0.3
+      ],
+      [
+        0.15,
+        -0.15
+      ],
+      [
+        0.15,
+        0.0
+      ],
+      [
+        0.15,
+        0.15
+      ],
+      [
+        0.15,
+        0.3
+      ],
+      [
+        0.15,
+        0.45
+      ],
+      [
+        0.3,
+        -0.45
+      ],
+      [
+        0.3,
+        -0.3
+      ],
+      [
+        0.3,
+        -0.15
+      ],
+      [
+        0.3,
+        0.0
+      ],
+      [
+        0.3,
+        0.15
+      ],
+      [
+        0.3,
+        0.3
+      ],
+      [
+        0.3,
+        0.45
+      ],
+      [
+        0.45,
+        -0.45
+      ],
+      [
+        0.45,
+        -0.3
+      ],
+      [
+        0.45,
+        -0.15
+      ],
+      [
+        0.45,
+        0.0
+      ],
+      [
+        0.45,
+        0.15
+      ],
+      [
+        0.45,
+        0.3
+      ],
+      [
+        0.45,
+        0.45
+      ],
+      [
+        0.6,
+        -0.45
+      ],
+      [
+        0.6,
+        -0.3
+      ],
+      [
+        0.6,
+        -0.15
+      ],
+      [
+        0.6,
+        0.0
+      ],
+      [
+        0.6,
+        0.15
+      ],
+      [
+        0.6,
+        0.3
+      ],
+      [
+        0.6,
+        0.45
+      ],
+      [
+        0.75,
+        -0.45
+      ],
+      [
+        0.75,
+        -0.3
+      ],
+      [
+        0.75,
+        -0.15
+      ],
+      [
+        0.75,
+        0.0
+      ],
+      [
+        0.75,
+        0.15
+      ],
+      [
+        0.75,
+        0.3
+      ],
+      [
+        0.75,
+        0.45
+      ],
+      [
+        0.9,
+        -0.45
+      ],
+      [
+        0.9,
+        -0.3
+      ],
+      [
+        0.9,
+        -0.15
+      ],
+      [
+        0.9,
+        0.0
+      ],
+      [
+        0.9,
+        0.15
+      ],
+      [
+        0.9,
+        0.3
+      ],
+      [
+        0.9,
+        0.45
+      ]
+    ],
+    "foot_scan": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.08,
+        0.0
+      ],
+      [
+        -0.08,
+        0.0
+      ],
+      [
+        0.0,
+        0.08
+      ],
+      [
+        0.0,
+        -0.08
+      ],
+      [
+        0.16,
+        0.0
+      ],
+      [
+        0.24,
+        0.0
+      ],
+      [
+        0.16,
+        0.08
+      ],
+      [
+        0.16,
+        -0.08
+      ]
+    ],
+    "foot_order": [
+      "FR",
+      "FL",
+      "RR",
+      "RL"
+    ],
+    "joint_order": [
+      "FR_hip",
+      "FR_thigh",
+      "FR_calf",
+      "FL_hip",
+      "FL_thigh",
+      "FL_calf",
+      "RR_hip",
+      "RR_thigh",
+      "RR_calf",
+      "RL_hip",
+      "RL_thigh",
+      "RL_calf"
+    ]
+  },
+  "config": {
+    "env": {
+      "num_envs": 4096,
+      "backend": "warp",
+      "device": "cuda:0",
+      "seed": 0,
+      "terrain_types": [
+        "rough",
+        "slope",
+        "stairs_up",
+        "stairs_down",
+        "obstacles",
+        "stepping_stones",
+        "gaps",
+        "piles"
+      ],
+      "terrain_levels": 10,
+      "tile_size": 8.0,
+      "terrain_resolution": 0.05,
+      "fine_terrain_resolution": 0.025,
+      "terrain_weights": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1.2,
+        1,
+        4.8
+      ],
+      "curriculum": true,
+      "max_start_level": 9,
+      "sim_dt": 0.004,
+      "control_dt": 0.02,
+      "solver_iterations": 20,
+      "solver_ls_iterations": 20,
+      "contact_set": "feet_trunk",
+      "nconmax": 64,
+      "njmax": 256,
+      "kp": 35.0,
+      "joint_damping": 0.5,
+      "action_scale": 0.25,
+      "action_clip": 4.0,
+      "episode_seconds": 20.0,
+      "target_distance": [
+        1.0,
+        3.0
+      ],
+      "max_speed": [
+        0.5,
+        1.0
+      ],
+      "arrival_radius": 0.25,
+      "hold_seconds": [
+        0.0,
+        2.0
+      ],
+      "slow_down_radius": 0.5,
+      "yaw_gain": 1.5,
+      "noise": 1.0,
+      "only_positive_rewards": false,
+      "rewards": {
+        "alive": 1.0,
+        "tracking_lin_vel": 1.5,
+        "tracking_ang_vel": 0.75,
+        "goal_progress": 0.5,
+        "lin_vel_z": -2.0,
+        "ang_vel_xy": -0.05,
+        "orientation": -0.5,
+        "feet_air_time": 0.5,
+        "feet_slip": -0.1,
+        "knee_collision": -1.0,
+        "stand_still": -0.5,
+        "torques": -0.0001,
+        "dof_acc": -2.5e-07,
+        "action_rate": -0.01,
+        "dof_pos_limits": -10.0,
+        "arrival": 10.0,
+        "fall": -10.0
+      }
+    },
+    "updates": 4000,
+    "rollout_steps": 24,
+    "epochs": 5,
+    "minibatches": 4,
+    "learning_rate": 0.001,
+    "desired_kl": 0.01,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip": 0.2,
+    "entropy": 0.005,
+    "value_coef": 1.0,
+    "max_grad_norm": 1.0,
+    "init_std": 1.0,
+    "hidden": [
+      512,
+      256,
+      128
+    ],
+    "checkpoint_every": 25,
+    "evaluation_every": 25,
+    "output": "runs/kth-controller-v2"
+  },
+  "steps": 393216000,
+  "update": 4000,
+  "source_revision": "ace7d7c18cc515ab6bef18b8efe3f233b49a77b0",
+  "versions": {
+    "python": "3.12.14",
+    "torch": "2.8.0+cu128",
+    "mujoco": "3.13.0"
+  },
+  "trained_performance": "See evaluation.jsonl of the run; evaluate held-out scenes before use",
+  "sha256": {
+    "controller.pt": "3a75bbdd0875e1aa0cc98dc65f39ca4f70552d644c530ea402d832a1f7aea9f0",
+    "actor.ts": "be059bb07eff908aa85ee00a45bc5c25613eab8ff2072860b8ab3c1bcc0d0329"
+  }
+}

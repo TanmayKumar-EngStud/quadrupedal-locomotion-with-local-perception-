@@ -12,7 +12,9 @@ dist/
 outputs/*.log
 outputs/abstract/
 runs/
-artifacts/
+# Controller bundles are shared in the repository; the zip copies and the smoke-test bundle are not.
+artifacts/*.zip
+artifacts/smoke/
 tmp/
 outputs/evaluation/
 outputs/benchmarks/
