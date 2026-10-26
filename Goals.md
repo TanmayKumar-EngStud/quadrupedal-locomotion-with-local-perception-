@@ -104,3 +104,15 @@ Planner loop: a robot standing on the seam between two piles counted as arriving
 | Train runs C and D from scratch for 8 hours on Amedeo's KTH GPU: B's rewards with the backward penalty and foot clearance; C strict, D relaxed curriculum | Amedeo | [ ] | — |
 
 On the larger test set, B (re-weighted rewards) beats A (variant 3's rewards): 83% of box-ground hops against 71%, 64% against 42% on the heightfield, and 84% / 82% on the fixed test (regular / noise 1.0). Both 49-point-scan runs walk backwards about 70% of the time they move on the pile scenes (v2: 4%), because the velocity command and `goal_progress` do not depend on heading and the scan looks as far behind as ahead; their early falls happen while turning around at the start. `backward_motion` (off by default) charges backward body speed while walking to a target; C and D use -2.
+
+## October 26, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Share the trained controllers in the repository (v1, v2, v3, variant 3, variant 9) | Tanmay | [X] | Not recorded |
+| Evaluate runs C and D after the gpu1 maintenance stopped them at 5.1 of 8 hours (step 8, larger test set, walking direction) | Amedeo | [X] | 1 h evaluation (elapsed) |
+| Resume run C alone for its remaining 2.9 hours | Amedeo | [ ] | — |
+
+The controller bundles in `artifacts/` are now tracked (zips and the smoke-test bundle stay ignored); `artifacts/README.md` maps each folder to its name in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md). `controller_v5` holds variant 3.
+
+Runs C and D stopped when the gpu1 maintenance shut the server down, at update 3,325 (C) and 3,400 (D). On the larger test set C reaches 93% of box-ground hops and 71% on the heightfield (B: 83% / 64%), with 5% of its hops ending in a fall (B: 14%) and 87% of its first hops on rows 8-9 arriving (B: 44%). D's relaxed curriculum brings the timeouts back (13% of box-ground hops, 36% on the heightfield). Both walk forward 96-97% of the time they move (A and B: 14%). C resumes alone for its remaining 2.9 hours on the new 1g.20gb slice.
