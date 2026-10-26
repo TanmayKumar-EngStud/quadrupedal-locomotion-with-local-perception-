@@ -43,9 +43,21 @@ def test_project_scenes_compile_and_are_reproducible(family, tmp_path):
 
 
 def test_mix_family_and_pile_irregularities():
-    mix, base = generate_terrain('mix', 9, 3), generate_terrain('open', 9, 3)
-    assert len(mix['stones']) < len(base['stones'])                                   # holes
-    assert len({round(s['z_top'], 4) for s in mix['stones']}) > 10 and any(s['roll'] for s in mix['stones'])   # rough, slanted
+    from quadruped_nav.terrain import MIX_FAMILIES
+    mix = generate_terrain('mix', 9, 3)
+    sections = {f: (a, b) for f, a, b in mix['metadata']['mix_sections']}
+    assert sorted(sections) == sorted(MIX_FAMILIES)                                   # every family once
+    inside = lambda f: [s for s in mix['stones'] if sections[f][0] <= s['x'] < sections[f][1]]
+    t9 = 9 / 19
+    assert all(abs(s['y']) <= .55 - .3 * t9 + 1e-9 for s in inside('bridge'))         # a narrow strip
+    assert len({round(s['z_top'], 4) for s in inside('rough')}) > 5                   # random heights
+    assert any(abs(s['roll']) > .01 for s in inside('slanted'))                       # tilted tops
+    assert max(s['z_top'] for s in inside('steps')) > .03                             # a raised terrace
+    assert len(inside('holes')) < len(inside('rough'))                                # missing piles
+    wall = mix['obstacles'][0]
+    assert not any(abs(s['x'] - wall['x']) < .3 and abs(s['y'] - wall['y']) < 1. for s in mix['stones'])   # slalom wall
+    moat_band = [s for s in inside('moat') if .35 < s['x'] - sections['moat'][0] < 1.15]
+    assert moat_band and all(abs(s['y'] - mix['metadata']['bridge_y']) <= .6 + 1e-9 for s in moat_band)  # one crossing
     assert generate_terrain('open', 5, 1, irregularity=0.) == generate_terrain('open', 5, 1)
     first, again = (generate_terrain('open', 5, 1, irregularity=1., irregularity_seed=8) for _ in range(2))
     assert first == again and first != generate_terrain('open', 5, 1, irregularity=1., irregularity_seed=9)

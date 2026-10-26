@@ -101,7 +101,7 @@ it: the tile is built from the options above.)
 | --- | --- |
 | `--checkpoint PATH` | controller (required) |
 | `--planner` | `optimistic` (default), `greedy`, `oracle` |
-| `--family` | `flat`, `open`, `holes`, `moat`, `dead_end`, `steps`, `rough`, `slalom`, `bridge`, `slanted`, `mix` (holes + rough + slanted together) |
+| `--family` | `flat`, `open`, `holes`, `moat`, `dead_end`, `steps`, `rough`, `slalom`, `bridge`, `slanted`, `mix` (one section of each of seven families on one course) |
 | `--row 0-9` | difficulty. Rows 10-19 end at once with `no_candidate`: their piles are narrower than the robot's 30 cm foot spacing, so the hop rule allows no hop |
 | `--ground boxes\|heightfield` | piles as MuJoCo boxes (default), or as the heightfield the controller senses |
 | `--seed N` | other layout of the same family and row |
@@ -127,11 +127,29 @@ fix, 6 of 10 after). Calibration's hop tables are measured as before.
 
 ### Mixed and irregular pile scenes
 
-`mix` combines the per-pile irregularities of three families on one course, each with
-the ranges of its own family:
-- piles missing between 1 and 6 m (holes: 5% of piles at row 0, about 15% at row 9);
-- random pile heights (rough: up to ±4 cm at row 9);
-- tilted pile tops (slanted: up to about 7° at row 9).
+`mix` is a 12.9 m course: a 1.2 m regular entry, then seven 1.5 m sections, one per
+family, each built with its own family's rule at the chosen row:
+
+| Section | What it holds (row 9 values) |
+| --- | --- |
+| `rough` | random pile heights, up to ±4 cm |
+| `slanted` | tilted pile tops, up to about 7° |
+| `steps` | one terrace: a step up, about 1 m of raised piles, a step down (2 cm at row 0, 5 cm at row 9) |
+| `holes` | missing piles (5% at row 0, about 15% at row 9) |
+| `bridge` | only a strip of piles remains (\|y\| ≤ 0.55 m at row 0, 0.41 m at row 9) |
+| `moat` | a 0.8 m band of pits with one crossing at the side (y ≈ ±1.5 to ±2.1 m) |
+| `slalom` | one 0.6 × 2 m wall on the side opposite the moat's crossing |
+
+`--seed` shuffles the section order (seed 10000: steps, moat, rough, slanted, holes,
+slalom, bridge). The terminal and the scene's `metadata.mix_sections` list the order with
+each section's start and end. Rough, slanted, steps, holes and bridge grow with the row;
+the moat, wall and course length stay the same.
+
+![mix rows 3 and 8](../outputs/scene_preview/mix_sections.png)
+
+Variant 9 crosses mix row 0 (16 s). In eight runs on rows 1-7 it fell every time: six
+times at the slalom wall, twice at the steps terrace. It also falls on the standalone
+`slalom` (rows 3 and 7) and `steps` (row 5) families, so mix inherits those failures.
 
 `--irregularity A` perturbs every pile of any family, `mix` included, with Gaussian
 deviations of mean 0. The standard deviation is the same for every family:
@@ -148,8 +166,9 @@ layout. The hop tables take `--irregularity` too (`calibrate`, seeded per trial,
 they stay reproducible).
 
 ```sh
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 0
 python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 3
-python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 7
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 7 --seed 10002
 python play.py --checkpoint artifacts/controller_v9/controller.pt --family open --row 5 --irregularity 1.0
 python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 5 --irregularity 1.0
 python play.py --checkpoint artifacts/controller_v9/controller.pt --family open --row 5 --irregularity 1.0 --irregularity-seed 4

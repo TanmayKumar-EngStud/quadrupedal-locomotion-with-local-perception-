@@ -143,6 +143,8 @@ def main():
     if not a.scene and a.irregularity:
         print(f"{a.family} row {a.row}, irregularity {a.irregularity:g}, seed {scene['metadata']['irregularity_seed']} "
               f"(repeat with --irregularity-seed {scene['metadata']['irregularity_seed']})",flush=True)
+    if 'mix_sections' in scene['metadata']:
+        print('mix sections: '+', '.join(f"{f} {a:.1f}-{b:.1f} m" for f,a,b in scene['metadata']['mix_sections']),flush=True)
     result=evaluate(a.checkpoint,scene,a.planner,a.seconds,a.seed,a.planner_checkpoint,a.viewer,a.ground,show_scan=not a.no_scan,
                     pile_arrival_radius=a.arrival_radius)
     path=Path(a.output);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(result,indent=2)+'\n')
