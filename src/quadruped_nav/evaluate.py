@@ -135,9 +135,14 @@ def main():
     p.add_argument('--ground',choices=['boxes','heightfield'],default='boxes',help='scene supports as boxes, or as the heightfield the controller senses')
     p.add_argument('--no-scan',action='store_true',help='viewer: hide the terrain samples the controller senses')
     p.add_argument('--arrival-radius',type=float,default=PILE_ARRIVAL_RADIUS,help='a subgoal pile counts as reached within this distance of its centre (m)')
+    p.add_argument('--irregularity',type=float,default=0.,help='per-pile irregularities: height, tilt, size, position (0 = regular); a new layout every run')
+    p.add_argument('--irregularity-seed',type=int,help='repeat one irregular layout (printed at the start of every irregular run)')
     p.add_argument('--output',default='outputs/evaluation/episode.json');a=p.parse_args()
     if a.seconds<=0:p.error('Duration must be positive')
-    scene=load_scene(a.scene) if a.scene else generate_terrain(a.family,a.row,a.seed)
+    scene=load_scene(a.scene) if a.scene else generate_terrain(a.family,a.row,a.seed,irregularity=a.irregularity,irregularity_seed=a.irregularity_seed)
+    if not a.scene and a.irregularity:
+        print(f"{a.family} row {a.row}, irregularity {a.irregularity:g}, seed {scene['metadata']['irregularity_seed']} "
+              f"(repeat with --irregularity-seed {scene['metadata']['irregularity_seed']})",flush=True)
     result=evaluate(a.checkpoint,scene,a.planner,a.seconds,a.seed,a.planner_checkpoint,a.viewer,a.ground,show_scan=not a.no_scan,
                     pile_arrival_radius=a.arrival_radius)
     path=Path(a.output);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(result,indent=2)+'\n')

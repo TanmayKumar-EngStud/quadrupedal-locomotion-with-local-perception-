@@ -20,7 +20,9 @@ The table bins hops by family, row and length. CalibratedEnv replaces the abstra
 simulator's always-successful hops with draws from these measured odds.
 
 --ground heightfield builds each scene as the heightfield the controller senses (the
-training terrain's representation) instead of boxes. With boxes, the soft Go1 foot
+training terrain's representation) instead of boxes. --irregularity A perturbs every pile
+(terrain.irregular_piles), with the trial's seed, so the table stays reproducible.
+--families mix measures the mixed family (holes + rough + slanted). With boxes, the soft Go1 foot
 slides through 2-4 cm cracks between piles, which a 4.6 cm foot should not do; the
 two tables together separate that simulator artifact from the controller's skill.
 """
@@ -50,14 +52,14 @@ HOPS_PER_TRIAL = 6
 PROXY_FAMILY = dict(flat='open', holes='open', moat='open', dead_end='open', bridge='open', slalom='open')
 
 
-def run_trial(checkpoint, family, row, trial, ground='boxes'):
+def run_trial(checkpoint, family, row, trial, ground='boxes', irregularity=0.):
     """Run one chained-hop episode and return one record per hop."""
     torch.set_num_threads(1)
     policy, saved = load_controller(checkpoint)
     seed = 300000 + 1000 * row + trial
     cfg = replace(EnvConfig(**saved['config']['env']), num_envs=1, backend='native', device='cpu',
                   seed=seed, noise=0., episode_seconds=1e9)
-    scene = generate_terrain(family, row, seed)
+    scene = generate_terrain(family, row, seed, irregularity=irregularity, irregularity_seed=seed)
     env, rng = GoalEnv(cfg, scene, ground=ground), random.Random(seed)
     terrain, limits = Terrain.from_scene(scene), Limits()
     piles = {p.id: p for p in terrain.piles}
@@ -115,8 +117,8 @@ def summarise(records):
     return bins
 
 
-def calibrate(checkpoint, output, trials=24, families=FAMILIES, rows=ROWS, workers=4, ground='boxes'):
-    jobs = [(str(checkpoint), family, row, trial, ground) for family in families for row in rows for trial in range(trials)]
+def calibrate(checkpoint, output, trials=24, families=FAMILIES, rows=ROWS, workers=4, ground='boxes', irregularity=0.):
+    jobs = [(str(checkpoint), family, row, trial, ground, irregularity) for family in families for row in rows for trial in range(trials)]
     started, records = time.monotonic(), []
     with get_context('spawn').Pool(workers) as pool:
         for done, result in enumerate(pool.imap_unordered(_run, jobs), 1):
@@ -124,7 +126,7 @@ def calibrate(checkpoint, output, trials=24, families=FAMILIES, rows=ROWS, worke
             if done % 100 == 0 or done == len(jobs):
                 print(f'{done}/{len(jobs)} trials, {time.monotonic() - started:.0f} s', flush=True)
     records.sort(key=lambda r: (r['family'], r['row'], r['trial'], r['hop']))
-    result = dict(format='hop-calibration/v2', checkpoint=str(Path(checkpoint).resolve()), ground=ground,
+    result = dict(format='hop-calibration/v2', checkpoint=str(Path(checkpoint).resolve()), ground=ground, irregularity=irregularity,
                   hops_per_trial=HOPS_PER_TRIAL, trials_per_cell=trials, records=records, bins=summarise(records),
                   wall_seconds=time.monotonic() - started,
                   note='Measured family/row/length bins; unmeasured cells fail rather than extrapolate. '
@@ -185,10 +187,11 @@ def main():
     p.add_argument('--workers', type=int, default=4, help='parallel CPU processes (keep <= 5 on the KTH pod)')
     p.add_argument('--ground', choices=['boxes', 'heightfield'], default='boxes',
                    help='scene supports as MuJoCo boxes, or as the heightfield the controller senses')
+    p.add_argument('--irregularity', type=float, default=0., help='per-pile irregularities (0 = the regular scenes)')
     p.add_argument('--output', default='outputs/calibration/hops.json')
     a = p.parse_args()
     if a.trials < 1: p.error('At least one trial required')
-    path = calibrate(a.checkpoint, a.output, a.trials, a.families, a.rows, a.workers, a.ground)
+    path = calibrate(a.checkpoint, a.output, a.trials, a.families, a.rows, a.workers, a.ground, a.irregularity)
     table = json.loads(path.read_text())
     print(f'{len(table["records"])} hops in {table["wall_seconds"]:.0f} s -> {path}')
     for b in table['bins']:

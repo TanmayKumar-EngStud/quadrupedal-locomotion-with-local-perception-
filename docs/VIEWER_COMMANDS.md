@@ -101,10 +101,12 @@ it: the tile is built from the options above.)
 | --- | --- |
 | `--checkpoint PATH` | controller (required) |
 | `--planner` | `optimistic` (default), `greedy`, `oracle` |
-| `--family` | `flat`, `open`, `holes`, `moat`, `dead_end`, `steps`, `rough`, `slalom`, `bridge`, `slanted` |
+| `--family` | `flat`, `open`, `holes`, `moat`, `dead_end`, `steps`, `rough`, `slalom`, `bridge`, `slanted`, `mix` (holes + rough + slanted together) |
 | `--row 0-9` | difficulty. Rows 10-19 end at once with `no_candidate`: their piles are narrower than the robot's 30 cm foot spacing, so the hop rule allows no hop |
 | `--ground boxes\|heightfield` | piles as MuJoCo boxes (default), or as the heightfield the controller senses |
 | `--seed N` | other layout of the same family and row |
+| `--irregularity A` | per-pile irregularities on any family: height, tilt, size and position, drawn anew on every run (0 = regular) |
+| `--irregularity-seed N` | repeat one irregular layout; every irregular run prints its seed |
 | `--seconds S` | time limit (default 60) |
 | `--arrival-radius M` | a subgoal pile counts as reached within this distance of its centre (default 0.20 m) |
 | `--no-scan` | hide the terrain samples |
@@ -122,6 +124,41 @@ Since October 22 the planner loop:
 Before, a robot on the seam between two piles "reached" both, and the planner
 bounced between them (variant 3: 1 of 10 test scenes reached the goal before the
 fix, 6 of 10 after). Calibration's hop tables are measured as before.
+
+### Mixed and irregular pile scenes
+
+`mix` combines the per-pile irregularities of three families on one course, each with
+the ranges of its own family:
+- piles missing between 1 and 6 m (holes: 5% of piles at row 0, about 15% at row 9);
+- random pile heights (rough: up to ±4 cm at row 9);
+- tilted pile tops (slanted: up to about 7° at row 9).
+
+`--irregularity A` perturbs every pile of any family, `mix` included, with Gaussian
+deviations of mean 0. The standard deviation is the same for every family:
+
+| Per pile | Standard deviation | Limit |
+| --- | --- | --- |
+| top height | A × 2 cm | ±2.5 standard deviations |
+| tilt about x and y | A × 6° | 15° |
+| side length | A × 3 cm | at least 12 cm |
+| centre shift | A × 2 cm | stays inside its own cell, so piles never overlap |
+
+Each run draws a new layout and prints its seed. Pass `--irregularity-seed` to repeat a
+layout. The hop tables take `--irregularity` too (`calibrate`, seeded per trial, so
+they stay reproducible).
+
+```sh
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 3
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 7
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family open --row 5 --irregularity 1.0
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family mix --row 5 --irregularity 1.0
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family open --row 5 --irregularity 1.0 --irregularity-seed 4
+python play.py --checkpoint artifacts/controller_v9/controller.pt --family dead_end --row 3 --irregularity 0.5 --planner oracle
+.venv/bin/python -m quadruped_nav.calibrate --workers 5 --checkpoint artifacts/controller_v9/controller.pt \
+    --families mix --rows 0 1 2 3 4 5 6 7 8 9 --output outputs/calibration/hops_v9_mix.json
+.venv/bin/python -m quadruped_nav.calibrate --workers 5 --checkpoint artifacts/controller_v9/controller.pt \
+    --irregularity 1.0 --rows 0 1 2 3 4 5 6 7 8 9 --output outputs/calibration/hops_v9_irregular1.json
+```
 
 ### v3 on every layout family
 

@@ -3,12 +3,40 @@ from __future__ import annotations
 import math
 import numpy as np
 
-TERRAINS = ("flat", "open", "holes", "moat", "dead_end", "steps", "rough", "slalom", "bridge", "slanted")
+TERRAINS = ("flat", "open", "holes", "moat", "dead_end", "steps", "rough", "slalom", "bridge", "slanted", "mix")
+
+# Per-pile irregularities (--irregularity A): Gaussian deviations with mean 0 and standard deviation
+# A x unit, the same for every family, clipped at IRREGULAR_CLIP standard deviations.
+IRREGULAR_CLIP = 2.5
+HEIGHT_UNIT, TILT_UNIT, SIZE_UNIT, SHIFT_UNIT = .02, math.radians(6), .03, .02   # m, rad, m, m
+MAX_TILT, MIN_SIZE = math.radians(15), .12
 
 
-def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0):
+def irregular_piles(scene, amount, seed):
+    """Copy of scene with every stone perturbed (platforms unchanged): top height, tilt about x and y, side length, and
+    centre position within its own lattice cell (so neighbouring piles never overlap). amount 0 returns the scene."""
+    if not amount: return scene
+    rng = np.random.default_rng(seed)
+    gauss = lambda unit, n=None: np.clip(rng.normal(0., amount * unit, n), -IRREGULAR_CLIP * amount * unit, IRREGULAR_CLIP * amount * unit)
+    pitch = scene['parameters']['stone_size'] + scene['parameters']['gap']
+    stones = []
+    for s in scene['stones']:
+        size = float(np.clip(s['size'] + gauss(SIZE_UNIT), MIN_SIZE, max(MIN_SIZE, min(s['size'], pitch) + SIZE_UNIT)))
+        room = max(0., (pitch - size) / 2)
+        dx, dy = np.clip(gauss(SHIFT_UNIT, 2), -room, room)
+        roll, tilt = np.clip(np.array([s['roll'], s['pitch']]) + gauss(TILT_UNIT, 2), -MAX_TILT, MAX_TILT)
+        stones.append(dict(s, x=float(s['x'] + dx), y=float(s['y'] + dy), z_top=float(s['z_top'] + gauss(HEIGHT_UNIT)),
+                           size=size, roll=float(roll), pitch=float(tilt)))
+    return dict(scene, stones=stones, metadata=dict(scene['metadata'], irregularity=float(amount), irregularity_seed=int(seed)))
+
+
+def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0, irregularity=0., irregularity_seed=None):
+    """One pile scene. family "mix" combines the per-pile irregularities of holes (missing piles), rough (random top
+    heights) and slanted (tilted tops), each with the ranges of its own family. irregularity > 0 then perturbs every
+    pile of any family (irregular_piles); without an irregularity_seed each call draws a new layout."""
     if family not in TERRAINS or not 0 <= row <= 19:
         raise ValueError("Unknown terrain or row outside 0..19")
+    if irregularity < 0: raise ValueError("irregularity must be >= 0")
     rng = np.random.default_rng(seed)
     t = row / 19
     size, gap = .50 - .38*t, .03 + .10*t
@@ -21,7 +49,7 @@ def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0):
         for j in range(-ny, ny+1):
             x, y = i*pitch, j*pitch
             keep = True
-            if family == "holes" and 1 < x < 6:
+            if family in ("holes", "mix") and 1 < x < 6:
                 keep = rng.random() > .05 + .20*t
             if family in ("moat", "dead_end"):
                 if 3 < x < 3.8 and abs(y-bridge_y) > .6:
@@ -37,10 +65,10 @@ def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0):
             if not keep:
                 continue
             z = 0.0
-            if family == "rough": z = float(rng.uniform(-.08*t,.08*t))
+            if family in ("rough", "mix"): z = float(rng.uniform(-.08*t,.08*t))
             if family == "steps": z = (.02+.06*t)*min(int(x/1.2), int((7-x)/1.2))
             roll = pitch_angle = 0.0
-            if family == "slanted":
+            if family in ("slanted", "mix"):
                 roll, pitch_angle = rng.uniform(-math.radians(15)*t, math.radians(15)*t, 2)
             stones.append(dict(id=f"T{i}_{j}", x=x,y=y,z_top=z,size=(pitch+.001 if family=="flat" else size),
                                roll=float(roll),pitch=float(pitch_angle),friction=float(rng.uniform(.8-.3*t,1.2))))
@@ -53,6 +81,9 @@ def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0):
                  metadata=dict(bridge_y=bridge_y,calibrated=False), obstacles=[])
     if family == "slalom":
         scene["obstacles"]=[dict(id=f"wall{i}",x=x,y=y,z_top=.8,size_x=.6,size_y=2.) for i,(x,y) in enumerate([(2,-.7),(4,.7)])]
+    if irregularity:
+        if irregularity_seed is None: irregularity_seed = int(np.random.SeedSequence().entropy % 2**31)
+        scene = irregular_piles(scene, irregularity, irregularity_seed)
     return scene
 
 
