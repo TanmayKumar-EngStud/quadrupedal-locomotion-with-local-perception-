@@ -99,6 +99,7 @@ Planner loop: a robot standing on the seam between two piles counted as arriving
 | Heading-alignment reward (face the direction of travel) and the variant 10 config | Tanmay | [X] | Not recorded |
 | Train variant 10 (variant 9 + heading alignment) for 6 hours | Tanmay | [ ] | — |
 | Pile-scene family `mix` and per-pile irregularities (`--irregularity`) for play.py and the hop tables | Tanmay | [X] | Not recorded |
+| Rebuild `mix` as seven family sections (rough, slanted, steps, holes, bridge, moat, slalom), order shuffled by seed | Tanmay | [X] | Not recorded |
 
 The controller bundles in `artifacts/` are now tracked (zips and the smoke-test bundle stay ignored); `artifacts/README.md` maps each folder to its name in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md). `controller_v5` holds variant 3.
 

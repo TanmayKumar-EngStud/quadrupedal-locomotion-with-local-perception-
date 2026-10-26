@@ -5,6 +5,11 @@ import numpy as np
 
 TERRAINS = ("flat", "open", "holes", "moat", "dead_end", "steps", "rough", "slalom", "bridge", "slanted", "mix")
 
+# Family "mix": a longer course of MIX_SECTION-long sections, one per family below in an order shuffled by the
+# scene seed, after a regular entry of MIX_START. Each section follows its own family's rule and ranges.
+MIX_FAMILIES = ("rough", "slanted", "steps", "holes", "bridge", "moat", "slalom")
+MIX_START, MIX_SECTION = 1.2, 1.5
+
 # Per-pile irregularities (--irregularity A): Gaussian deviations with mean 0 and standard deviation
 # A x unit, the same for every family, clipped at IRREGULAR_CLIP standard deviations.
 IRREGULAR_CLIP = 2.5
@@ -30,10 +35,24 @@ def irregular_piles(scene, amount, seed):
     return dict(scene, stones=stones, metadata=dict(scene['metadata'], irregularity=float(amount), irregularity_seed=int(seed)))
 
 
+def _mix_pile(kind, local, y, t, size, rng, bridge_y, wall_y):
+    """(keep, top height, roll, pitch) of one pile in a mix section of family kind; local = x within the section.
+    The rules and ranges are those of the family itself, moved into the section."""
+    z = roll = tilt = 0.
+    if kind == "holes" and rng.random() <= .05 + .20*t: return False, z, roll, tilt
+    if kind == "bridge" and abs(y) > .55-.3*t: return False, z, roll, tilt
+    if kind == "moat" and .35 < local < 1.15 and abs(y-bridge_y) > .6: return False, z, roll, tilt
+    if kind == "slalom" and abs(local-.75) < .30+size/2 and abs(y-wall_y) < 1.0+size/2: return False, z, roll, tilt
+    if kind == "rough": z = float(rng.uniform(-.08*t, .08*t))
+    if kind == "steps" and .25 <= local <= 1.25: z = .02+.06*t          # one terrace: a step up, then a step down
+    if kind == "slanted": roll, tilt = rng.uniform(-math.radians(15)*t, math.radians(15)*t, 2)
+    return True, z, float(roll), float(tilt)
+
+
 def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0, irregularity=0., irregularity_seed=None):
-    """One pile scene. family "mix" combines the per-pile irregularities of holes (missing piles), rough (random top
-    heights) and slanted (tilted tops), each with the ranges of its own family. irregularity > 0 then perturbs every
-    pile of any family (irregular_piles); without an irregularity_seed each call draws a new layout."""
+    """One pile scene. family "mix" is a 12 m course with one section of each of MIX_FAMILIES (rough, slanted, steps,
+    holes, bridge, moat, slalom) in a seed-shuffled order. irregularity > 0 then perturbs every pile of any family
+    (irregular_piles); without an irregularity_seed each call draws a new layout."""
     if family not in TERRAINS or not 0 <= row <= 19:
         raise ValueError("Unknown terrain or row outside 0..19")
     if irregularity < 0: raise ValueError("irregularity must be >= 0")
@@ -42,14 +61,26 @@ def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0, irregularit
     size, gap = .50 - .38*t, .03 + .10*t
     # Fixed pitch limits geometry count and lets curricula shrink tops gradually.
     pitch = size + gap
-    nx, ny = math.ceil(7/pitch)+1, math.ceil(3/pitch)
+    course = MIX_START + MIX_SECTION*len(MIX_FAMILIES) + .3 if family == "mix" else 7
+    nx, ny = math.ceil(course/pitch)+1, math.ceil(3/pitch)
     bridge_y = float(rng.choice([-1, 1])) * (1.5 + 1.2*t)
+    if family == "mix":
+        sections = [str(f) for f in rng.permutation(MIX_FAMILIES)]
+        wall_y = -.7 if bridge_y > 0 else .7
     stones = []
     for i in range(nx):
         for j in range(-ny, ny+1):
             x, y = i*pitch, j*pitch
+            if family == "mix":
+                k = int((x - MIX_START) // MIX_SECTION)
+                kind = sections[k] if x >= MIX_START and k < len(sections) else "open"
+                keep, z, roll, pitch_angle = _mix_pile(kind, x - MIX_START - k*MIX_SECTION, y, t, size, rng, bridge_y, wall_y)
+                if keep:
+                    stones.append(dict(id=f"T{i}_{j}", x=x, y=y, z_top=z, size=size, roll=roll, pitch=pitch_angle,
+                                       friction=float(rng.uniform(.8-.3*t, 1.2))))
+                continue
             keep = True
-            if family in ("holes", "mix") and 1 < x < 6:
+            if family == "holes" and 1 < x < 6:
                 keep = rng.random() > .05 + .20*t
             if family in ("moat", "dead_end"):
                 if 3 < x < 3.8 and abs(y-bridge_y) > .6:
@@ -65,10 +96,10 @@ def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0, irregularit
             if not keep:
                 continue
             z = 0.0
-            if family in ("rough", "mix"): z = float(rng.uniform(-.08*t,.08*t))
+            if family == "rough": z = float(rng.uniform(-.08*t,.08*t))
             if family == "steps": z = (.02+.06*t)*min(int(x/1.2), int((7-x)/1.2))
             roll = pitch_angle = 0.0
-            if family in ("slanted", "mix"):
+            if family == "slanted":
                 roll, pitch_angle = rng.uniform(-math.radians(15)*t, math.radians(15)*t, 2)
             stones.append(dict(id=f"T{i}_{j}", x=x,y=y,z_top=z,size=(pitch+.001 if family=="flat" else size),
                                roll=float(roll),pitch=float(pitch_angle),friction=float(rng.uniform(.8-.3*t,1.2))))
@@ -81,6 +112,10 @@ def generate_terrain(family="open", row=0, seed=0, pocket_depth=2.0, irregularit
                  metadata=dict(bridge_y=bridge_y,calibrated=False), obstacles=[])
     if family == "slalom":
         scene["obstacles"]=[dict(id=f"wall{i}",x=x,y=y,z_top=.8,size_x=.6,size_y=2.) for i,(x,y) in enumerate([(2,-.7),(4,.7)])]
+    if family == "mix":
+        starts = [MIX_START + k*MIX_SECTION for k in range(len(sections))]
+        scene["metadata"] = dict(scene["metadata"], mix_sections=[[f, s, s + MIX_SECTION] for f, s in zip(sections, starts)])
+        scene["obstacles"] = [dict(id="wall0", x=starts[sections.index("slalom")] + .75, y=wall_y, z_top=.8, size_x=.6, size_y=2.)]
     if irregularity:
         if irregularity_seed is None: irregularity_seed = int(np.random.SeedSequence().entropy % 2**31)
         scene = irregular_piles(scene, irregularity, irregularity_seed)
