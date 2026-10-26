@@ -1,4 +1,5 @@
 import json
+import math
 from dataclasses import replace
 from types import SimpleNamespace
 import numpy as np
@@ -39,6 +40,22 @@ def test_project_scenes_compile_and_are_reproducible(family, tmp_path):
     model = mujoco.MjModel.from_xml_path(str(build_mjcf(scene, tmp_path / 'terrain.xml')))
     assert model.nu == 12 and len(scene['stones']) > 0
     assert len(Terrain.from_scene(scene).piles) == len(scene['stones']) + 2
+
+
+def test_mix_family_and_pile_irregularities():
+    mix, base = generate_terrain('mix', 9, 3), generate_terrain('open', 9, 3)
+    assert len(mix['stones']) < len(base['stones'])                                   # holes
+    assert len({round(s['z_top'], 4) for s in mix['stones']}) > 10 and any(s['roll'] for s in mix['stones'])   # rough, slanted
+    assert generate_terrain('open', 5, 1, irregularity=0.) == generate_terrain('open', 5, 1)
+    first, again = (generate_terrain('open', 5, 1, irregularity=1., irregularity_seed=8) for _ in range(2))
+    assert first == again and first != generate_terrain('open', 5, 1, irregularity=1., irregularity_seed=9)
+    assert generate_terrain('open', 5, 1, irregularity=1.) != generate_terrain('open', 5, 1, irregularity=1.)   # new layout every run
+    regular = generate_terrain('open', 5, 1)
+    pitch = regular['parameters']['stone_size'] + regular['parameters']['gap']
+    for s, b in zip(first['stones'], regular['stones']):
+        assert abs(s['x'] - b['x']) <= (pitch - s['size']) / 2 + 1e-9 and abs(s['y'] - b['y']) <= (pitch - s['size']) / 2 + 1e-9
+        assert max(abs(s['roll']), abs(s['pitch'])) <= math.radians(15) + 1e-9 and s['size'] >= .12
+    Terrain.from_scene(first); HeightGrid.from_scene(first)                            # planner and height map accept it
 
 
 def test_terrain_grid_is_reproducible_and_tiles_join_without_cliffs():
