@@ -42,6 +42,7 @@ def reward_config():
             tracking_lin_vel=1.5,    # Match the commanded velocity toward the target (body frame).
             tracking_ang_vel=0.75,   # Match the commanded turning rate (turn to face the target).
             goal_progress=0.5,       # Velocity toward the target in m/s, capped at the commanded speed.
+            heading_alignment=0.0,   # Cosine between heading and direction of travel (+1 forwards, -1 backwards). Off here; 0.5 in variant 10.
             arrival=10.0,            # EVENT: once for every target reached.
 
             # 2. Keep the body controlled.
@@ -81,6 +82,7 @@ def reward_config():
             edge_drop=0.05,              # Metres; a drop this deep within 5 cm of a standing foot makes it an edge.
             clearance_target=0.10,       # Metres; feet_clearance saturates when a swing lifts the foot this high (Lab 1 C).
             clearance_min_air_time=0.08, # Seconds; shorter swings (contact flicker) earn no feet_clearance (Lab 1 C).
+            heading_min_speed=0.2,       # m/s; slower movement earns no heading_alignment (its direction is noise).
         ),
     )
 
@@ -115,6 +117,15 @@ def _reward_goal_progress(s, p):
     """Velocity toward the target (m/s), at most the commanded speed; 0 while holding at a target."""
     toward = (s.lin_vel_world[:, :2] * s.target_direction).sum(-1)
     return torch.minimum(toward, s.max_speed) * s.moving
+
+
+def _reward_heading_alignment(s, p):
+    """Cosine between the body's heading and its horizontal velocity: +1 walking forwards, -1 backwards, 0 sideways.
+
+    Paid while walking faster than heading_min_speed to a target more than slow_down_radius away, where the command
+    also turns the robot toward the target; close to a target, stepping sideways or back stays free.
+    """
+    return s.heading_cos * (s.speed_xy > p['heading_min_speed']) * s.moving * s.target_far
 
 
 def _reward_arrival(s, p):

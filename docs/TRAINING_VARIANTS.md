@@ -644,6 +644,41 @@ The server stopped after 5.0 hours (update 9,222). The run resumed from `last.pt
 - Its fixed-test success is the highest on every level.
 - Charts: `outputs/comparison_round3/` on Tanmay's laptop.
 
+## Variant 10: variant 9 rewarded for facing the direction of travel (6 hours)
+
+Variant 9 walks backwards most of the time. In closed-loop runs on all 8 terrain types,
+levels 0-9, it moves at more than 0.2 m/s backwards 57% of the time, sideways 32% and
+forwards 11%. The old-scan controllers walk forwards: v2 59% and variant 3 64% of the
+time, backwards 7-8%.
+
+A likely cause is the new terrain scan, which is symmetric front to back: the rear
+feet's squares look as far behind as the front feet's look ahead. The old scan reached
+0.9 m ahead but only 0.45 m behind, so facing forwards meant seeing more of the
+terrain ahead. Variant 1 settled on walking backwards from scratch, and variants 5
+and 9 inherited it.
+
+`configs/kth-variant-10-heading-6h.json` is variant 9's config with one new reward. It
+resumes from `runs/kth-variant-5-edge-clearance-6h/last.pt` (update 10176, the same
+weights as `artifacts/controller_v9`).
+
+| Reward | Variant 9 | Variant 10 | What it does |
+| --- | --- | --- | --- |
+| `heading_alignment` | 0 | 0.5 | cosine between the body's heading (yaw) and its horizontal velocity: +1 forwards, -1 backwards, 0 sideways |
+
+The reward (`_reward_heading_alignment` in `rl/rewards.py`):
+- is paid only while walking faster than `heading_min_speed` (0.2 m/s) to a target
+  more than `slow_down_radius` (0.5 m) away, which is where the command also turns
+  the robot toward its target;
+- leaves stepping sideways or back to reach a nearby target free.
+
+At 0.5 it is worth up to 0.5 per second: walking forwards instead of backwards gains
+1.0 per second, against at most 1.5 for velocity tracking.
+
+```sh
+setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-variant-10-heading-6h.json \
+    --resume runs/kth-variant-5-edge-clearance-6h/last.pt > runs/kth-variant-10-heading-6h.log 2>&1 < /dev/null &
+```
+
 ## Controller family tree
 
 An arrow means "continues training from" (`--resume`: same weights, normalizer, optimizer
@@ -676,14 +711,18 @@ flowchart TD
     VA5["variant 5 · 946–4234 · 6 h<br/>noise ramp, 8192 robots,<br/>4 tile variants, entropy 0.001<br/>box hops 73%, best general test"]
     VA8["variant 8 · 946–4299 · 6 h<br/>relaxed curriculum, 8192 robots<br/>box hops 57%, many timeouts"]
     VA9["variant 9 · 4235–10176 · 6 h<br/>variant 5 + edge −1<br/>+ foot clearance 0.5 (Lab 1 C)<br/>box hops 96%, best overall"]
+    VA10["variant 10 · from 10177 · 6 h<br/>variant 9 + heading alignment 0.5<br/>(face the direction of travel)<br/>in progress"]
     VA1 --> VA5
     VA1 --> VA8
     VA5 --> VA9
+    VA9 --> VA10
   end
   classDef best fill:#E1F5EE,stroke:#0F6E56,color:#085041
   classDef weak fill:#F1EFE8,stroke:#888780,color:#444441
+  classDef running fill:#EEEDFE,stroke:#534AB7,color:#3C3489,stroke-dasharray:5 4
   class VA3,VA5,VA9 best
   class V3,VA1 weak
+  class VA10 running
 ```
 
 | Controller | Starts from | What changed for its training | Box hops |
@@ -699,6 +738,7 @@ flowchart TD
 | variant 5 | variant 1 | noise ramp, 6 h, 8,192 robots, 4 tile variants, 640-robot validation, entropy 0.001 | 73% |
 | variant 8 | variant 1 | relaxed curriculum, otherwise as variant 5 | 57% |
 | variant 9 | variant 5 | edge penalty -1 and foot clearance 0.5 (Lab 1 C), otherwise as variant 5 | 96% |
+| variant 10 | variant 9 | heading alignment 0.5 (reward for facing the direction of travel), otherwise as variant 9 | in progress |
 
 Configs written but not run: `kth-controller-v3-from-v2`, `kth-controller-v4-from-v2`,
 `kth-controller-v2-continued`, `kth-variant-0-control`, `kth-variant-0-scratch-v1-scan`,
@@ -714,6 +754,7 @@ round 2 instead, from variant 1.
 | `curriculum_rule` | `strict` (default), `relaxed` | `GoalEnv._update_levels()`, `episode_progress` | `test_relaxed_curriculum_promotes_at_60_percent_and_demotes_only_without_progress` |
 | `evaluation_trials`, `evaluation_levels` (top level) | 4, None (levels 0/3/6/9) | `train.py` passes them to `TerrainEvaluator`; `goal_check --trials --levels` for tests | `test_validation_size_follows_the_config` |
 | `rewards.feet_clearance`, `reward_params.clearance_target`, `clearance_min_air_time` | 0 (off), 0.10 m, 0.08 s | `_reward_feet_clearance()` in `rl/rewards.py`, `GoalEnv.swing_peak` | `test_feet_clearance_pays_the_swing_height_on_touchdown` |
+| `rewards.heading_alignment`, `reward_params.heading_min_speed` | 0 (off), 0.2 m/s | `_reward_heading_alignment()` in `rl/rewards.py`, `heading_cos` and `target_far` in `GoalEnv.step` | `test_heading_alignment_rewards_walking_forwards` |
 | `rewards.feet_edge`, `reward_params.edge_drop` | 0 (off), 0.05 m | `_reward_feet_edge()` in `rl/rewards.py`, `GoalEnv._edge_drop()` | `test_feet_edge_penalty_marks_supported_feet_near_a_drop` |
 | viewer markers | on, `--no-scan` | `src/quadruped_nav/markers.py`, `watch.py`, `evaluate.py` (play.py) | |
 

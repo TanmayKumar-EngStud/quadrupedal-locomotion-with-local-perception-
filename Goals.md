@@ -96,6 +96,8 @@ Planner loop: a robot standing on the seam between two piles counted as arriving
 | Goals | Contributor | Status | Time taken |
 | --- | --- | --- | --- |
 | Share the trained controllers in the repository (v1, v2, v3, variant 3, variant 9) | Tanmay | [X] | Not recorded |
+| Heading-alignment reward (face the direction of travel) and the variant 10 config | Tanmay | [X] | Not recorded |
+| Train variant 10 (variant 9 + heading alignment) for 6 hours | Tanmay | [ ] | — |
 
 The controller bundles in `artifacts/` are now tracked (zips and the smoke-test bundle stay ignored); `artifacts/README.md` maps each folder to its name in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md). `controller_v5` holds variant 3.
 
