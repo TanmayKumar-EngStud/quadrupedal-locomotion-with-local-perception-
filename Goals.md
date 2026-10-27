@@ -111,5 +111,18 @@ The controller bundles in `artifacts/` are now tracked (zips and the smoke-test 
 | Train variant 10 with heading alignment 0.7 for 8 hours (continued from October 26) | Tanmay | [X] | 8 h GPU run (elapsed) |
 | Evaluate variant 10 (heading 0.7) on the larger test set and the heading check against variant 9 | Tanmay | [X] | Not recorded |
 | Add variant 10 to the round 3 charts, TRAINING_VARIANTS.md and `artifacts/controller_v10` | Tanmay | [X] | Not recorded |
+| Dead-end planner comparison in physics (RQ2): variant 10, row 3, pockets 1, 2 and 3 m, greedy / optimistic / oracle, 6 seeds each | Tanmay | [X] | Not recorded |
 
 Variant 10 (heading 0.7, 8 h) is the best controller so far: 98% of box-ground pile hops (variant 9: 96%), 84% on heightfield ground (81%), and 88.7% on the fixed test (87.5%). The heading reward still had no effect: it walks backwards 57% of the time, like variant 9.
+
+Dead ends with variant 10: greedy reaches the goal in 0 of 18 episodes, optimistic in 12 of 18 and the oracle in 16 of 18. Optimistic paths are 1.28, 1.45 and 1.57 times the oracle's for 1, 2 and 3 m pockets. Greedy loops at the end of the pocket until it falls or times out; the oracle's two failures were falls in the first 4 s.
+
+## October 28, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Rewrite README.md: results first (GIFs, charts, controller table, terrain design), then a brief reproduce section | Tanmay | [X] | Not recorded |
+| README GIFs (variant 10 escaping an irregular dead end; variant 10 on irregular pile training tiles) and figures in `docs/media` | Tanmay | [X] | Not recorded |
+| `scripts/dead_end_sweep.py` and the variant 10 dead-end results in `docs/results` | Tanmay | [X] | Not recorded |
+
+The GIFs use selected seeds; the README gives the measured rates. `scripts/dead_end_sweep.py` reproduces a recorded episode exactly (oracle, 1 m pocket, seed 10000: 9.2 s, 9.64 m).
