@@ -10,3 +10,14 @@ dist/
 .env.*
 !.env.example
 outputs/*.log
+outputs/abstract/
+runs/
+# Controller bundles are shared in the repository; the zip copies and the smoke-test bundle are not.
+artifacts/*.zip
+artifacts/smoke/
+tmp/
+outputs/evaluation/
+outputs/benchmarks/
+outputs/calibration/
+MUJOCO_LOG.TXT
+outputs/terrains/

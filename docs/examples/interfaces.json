@@ -1,0 +1,65 @@
+{
+  "review_status": "DRAFT: proposed interfaces, not implemented by the current environment",
+  "pile": {
+    "schema_version": "pile/v0.1-draft",
+    "id": "pile_d19e",
+    "top_center_world_m": [1.59, 0.0, 0.0],
+    "top_size_xy_m": [0.50, 0.50],
+    "top_orientation_rpy_rad": [0.0, 0.0, 0.0]
+  },
+  "planner_observation": {
+    "schema_version": "planner_observation/v0.1-draft",
+    "episode_id": "development-0001",
+    "decision_index": 0,
+    "time_s": 0.0,
+    "robot_pose_odom": {
+      "base_position_m": [0.0, 0.0, 0.30],
+      "yaw_rad": 0.0
+    },
+    "goal_relative_xy_m": [8.0, 0.0],
+    "observed_region": {
+      "frame": "odom",
+      "shape": "disc",
+      "center_xy_m": [0.0, 0.0],
+      "radius_m": 2.0,
+      "visibility_model": "perfect_radius_filter_without_occlusion"
+    },
+    "visible_piles": [
+      {"id": "pile_a84c", "relative_top_center_m": [0.0, 0.0, -0.30], "top_size_xy_m": [0.50, 0.50], "top_normal_local": [0.0, 0.0, 1.0]},
+      {"id": "pile_b72f", "relative_top_center_m": [0.53, 0.0, -0.30], "top_size_xy_m": [0.50, 0.50], "top_normal_local": [0.0, 0.0, 1.0]},
+      {"id": "pile_c35b", "relative_top_center_m": [1.06, 0.0, -0.30], "top_size_xy_m": [0.50, 0.50], "top_normal_local": [0.0, 0.0, 1.0]},
+      {"id": "pile_d19e", "relative_top_center_m": [1.59, 0.0, -0.30], "top_size_xy_m": [0.50, 0.50], "top_normal_local": [0.0, 0.0, 1.0]}
+    ],
+    "action_mask": [false, false, true, true]
+  },
+  "optional_visit_memory": {
+    "applies_to": ["L2", "L3"],
+    "visit_counts_by_pile_id": {"pile_a84c": 1.0, "pile_b72f": 0.0, "pile_c35b": 0.0, "pile_d19e": 0.0}
+  },
+  "planner_selection": {
+    "schema_version": "planner_selection/v0.1-draft",
+    "episode_id": "development-0001",
+    "decision_index": 0,
+    "status": "selected",
+    "target_pile_id": "pile_d19e"
+  },
+  "resolved_subgoal": {
+    "schema_version": "subgoal/v0.1-draft",
+    "episode_id": "development-0001",
+    "decision_index": 0,
+    "target_pile_id": "pile_d19e",
+    "frame": "odom",
+    "x": 1.59,
+    "y": 0.0,
+    "heading": 0.0,
+    "is_final_goal": false
+  },
+  "controller_command": {
+    "schema_version": "controller_command/v0.1-draft",
+    "frame": "local_yaw",
+    "target_xy_m": [1.59, 0.0],
+    "heading_error_sin_cos": [0.0, 1.0],
+    "time_left_s": 4.0,
+    "is_final_goal": false
+  }
+}
