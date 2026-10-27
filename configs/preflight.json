@@ -1,0 +1,5 @@
+{
+  "env": {"num_envs": 256, "backend": "warp", "device": "cuda:0"},
+  "updates": 3, "rollout_steps": 24, "checkpoint_every": 1, "evaluation_every": 2,
+  "output": "runs/gpu-preflight-v3"
+}

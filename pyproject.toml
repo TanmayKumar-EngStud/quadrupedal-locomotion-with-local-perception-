@@ -7,7 +7,17 @@ name = "language-guided-quadrupedal-navigation"
 version = "0.1.0"
 description = "MuJoCo Go1 scenes for language-guided navigation over sparse terrain"
 requires-python = ">=3.12"
-dependencies = ["mujoco==3.3.7", "numpy>=2,<3", "pillow>=11,<12"]
+dependencies = ["mujoco==3.13.0", "numpy>=2,<3", "pillow>=11,<12"]
+
+[project.optional-dependencies]
+train = ["torch==2.8.0"]
+cloud = ["torch==2.8.0", "mujoco-warp==3.13.0", "warp-lang==1.15.0"]
+
+[project.scripts]
+quad-train = "quadruped_nav.train:main"
+quad-evaluate = "quadruped_nav.evaluate:main"
+quad-benchmark = "quadruped_nav.benchmark:main"
+quad-learn-planner = "quadruped_nav.learned:main"
 
 [dependency-groups]
 dev = ["pytest>=8,<9"]

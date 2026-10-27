@@ -1,0 +1,5 @@
+{
+  "env": {"num_envs": 8, "backend": "native", "device": "cpu", "terrain_levels": 2, "max_start_level": 1},
+  "updates": 3, "rollout_steps": 8, "epochs": 2, "minibatches": 2, "hidden": [64, 64],
+  "checkpoint_every": 1, "evaluation_every": 2, "output": "runs/smoke"
+}
