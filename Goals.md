@@ -97,9 +97,19 @@ Planner loop: a robot standing on the seam between two piles counted as arriving
 | --- | --- | --- | --- |
 | Share the trained controllers in the repository (v1, v2, v3, variant 3, variant 9) | Tanmay | [X] | Not recorded |
 | Heading-alignment reward (face the direction of travel) and the variant 10 config | Tanmay | [X] | Not recorded |
-| Train variant 10 (variant 9 + heading alignment) for 6 hours | Tanmay | [ ] | — |
+| Train variant 10 (variant 9 + heading alignment 0.5) for 6 hours: the server stopped at 5 h; the robot still walks backwards 57% of the time | Tanmay | [X] | 5 h |
+| Train variant 10 again with heading alignment 0.7 for 8 hours, with a keep-alive so the hub does not stop the server | Tanmay | [ ] | Not recorded |
 | Pile-scene family `mix` and per-pile irregularities (`--irregularity`) for play.py and the hop tables | Tanmay | [X] | Not recorded |
 | Rebuild `mix` as seven family sections (rough, slanted, steps, holes, bridge, moat, slalom), order shuffled by seed | Tanmay | [X] | Not recorded |
 
 The controller bundles in `artifacts/` are now tracked (zips and the smoke-test bundle stay ignored); `artifacts/README.md` maps each folder to its name in [TRAINING_VARIANTS.md](docs/TRAINING_VARIANTS.md). `controller_v5` holds variant 3.
 
+## October 27, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| Train variant 10 with heading alignment 0.7 for 8 hours (continued from October 26) | Tanmay | [X] | 8 h GPU run (elapsed) |
+| Evaluate variant 10 (heading 0.7) on the larger test set and the heading check against variant 9 | Tanmay | [X] | Not recorded |
+| Add variant 10 to the round 3 charts, TRAINING_VARIANTS.md and `artifacts/controller_v10` | Tanmay | [X] | Not recorded |
+
+Variant 10 (heading 0.7, 8 h) is the best controller so far: 98% of box-ground pile hops (variant 9: 96%), 84% on heightfield ground (81%), and 88.7% on the fixed test (87.5%). The heading reward still had no effect: it walks backwards 57% of the time, like variant 9.
