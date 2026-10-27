@@ -4,7 +4,8 @@ jobs:
   cpu:
     runs-on: ubuntu-latest
     env:
-      MUJOCO_GL: egl
+      # The tests never render. 'egl' made `import mujoco` load libEGL, which the runner does not have.
+      MUJOCO_GL: disable
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
