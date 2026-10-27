@@ -15,17 +15,18 @@ column.
 | `controller_v2` | v2 | `runs/kth-controller-v2` | 4000 | old | 86% |
 | `controller_v3` | v3 | `runs/kth-controller-v3` | 12724 | old | 31% |
 | `controller_v5` | **variant 3** (v2 + noise 0.5, edge, gap and arrival-speed penalties) | `runs/kth-variant-3-noise-edge` | 4916 | old | 94% |
-| `controller_v9` | variant 9 (variant 5 + edge penalty + foot clearance), the best so far | `runs/kth-variant-5-edge-clearance-6h` | 10176 | 49 points per foot (`feet49`) | 96% |
+| `controller_v9` | variant 9 (variant 5 + edge penalty + foot clearance) | `runs/kth-variant-5-edge-clearance-6h` | 10176 | 49 points per foot (`feet49`) | 96% |
+| `controller_v10` | variant 10, heading 0.7 (variant 9 + heading reward 0.7, 8 h), the best so far | `runs/kth-variant-10-heading-0.7-8h` | 18123 | `feet49` | 98% |
 
 Check a bundle after downloading:
 
 ```sh
-.venv/bin/python -c "import hashlib, json, sys; d=sys.argv[1]; m=json.load(open(d+'/manifest.json')); print({n: hashlib.sha256(open(d+'/'+n,'rb').read()).hexdigest() == h for n, h in m['sha256'].items()}, 'update', m['update'])" artifacts/controller_v9
+.venv/bin/python -c "import hashlib, json, sys; d=sys.argv[1]; m=json.load(open(d+'/manifest.json')); print({n: hashlib.sha256(open(d+'/'+n,'rb').read()).hexdigest() == h for n, h in m['sha256'].items()}, 'update', m['update'])" artifacts/controller_v10
 ```
 
 Watch one:
 
 ```sh
-python watch.py --checkpoint artifacts/controller_v9/controller.pt --terrain piles --level 5
-python play.py --checkpoint artifacts/controller_v9/controller.pt --family open --row 5
+python watch.py --checkpoint artifacts/controller_v10/controller.pt --terrain piles --level 5
+python play.py --checkpoint artifacts/controller_v10/controller.pt --family open --row 5
 ```

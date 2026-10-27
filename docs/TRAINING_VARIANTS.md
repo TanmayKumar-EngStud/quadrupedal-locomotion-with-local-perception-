@@ -679,6 +679,85 @@ setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-varian
     --resume runs/kth-variant-5-edge-clearance-6h/last.pt > runs/kth-variant-10-heading-6h.log 2>&1 < /dev/null &
 ```
 
+### First attempt (heading 0.5): no change in heading (October 26)
+
+The server stopped at 22:24, 5.0 hours into the run (update 15,150), and its test
+script stopped with it. Variant 9 had stopped at 5.0 hours too: the hub shuts a server
+down after about 5 hours without browser activity, and nobody looked at the server
+during either run.
+
+The run itself was healthy:
+- targets reached in training: 94.6% (variant 9's last hour: 94.9%);
+- falls: 5.3 per 10,000 steps (variant 9: 5.0);
+- pile robots' level: 1.08 to 1.49;
+- validation, mean of the last 20: 91.4% of all targets and 53.9% on piles (variant
+  9's last 20: 89.8% and 49.0%).
+
+But the robot did not turn around. The heading term stayed at -0.0018 per step for all
+5 hours: with weight 0.5 and the 0.02 s step, a mean gated cosine of about -0.18. That
+is 1.6% of the 0.11 total reward per step; the arrival reward alone is 0.095.
+`runs/heading_check.py` on the 5-hour weights:
+
+| Moving (any distance) | Mean cosine | Forwards (cos > 0.7) | Sideways | Backwards (cos < -0.7) |
+| --- | --- | --- | --- | --- |
+| variant 9 | — | 11% | 32% | 57% |
+| variant 10, heading 0.5, 5 h | -0.45 | 12% | 31% | 57% |
+
+### Second attempt: heading 0.7, 8 hours (October 26, 23:07, to October 27, 07:08)
+
+`configs/kth-variant-10-heading-0.7-8h.json` is the first attempt's config with
+`heading_alignment` 0.7 and `max_hours` 8. It resumes again from variant 9
+(`runs/kth-variant-5-edge-clearance-6h/last.pt`, update 10176), on variant 9's terrain.
+
+```sh
+setsid nohup .venv/bin/python -m quadruped_nav.train --config configs/kth-variant-10-heading-0.7-8h.json \
+    --resume runs/kth-variant-5-edge-clearance-6h/last.pt > runs/kth-variant-10-heading-0.7-8h.log 2>&1 < /dev/null &
+setsid nohup bash runs/eval_variant10_0.7.sh < /dev/null > runs/eval-variant10-0.7.out 2>&1 &
+```
+
+`runs/eval_variant10_0.7.sh` (on the server) does three things:
+- keeps the server active with a request to its own API every 5 minutes, so the hub
+  does not stop it at 5 hours;
+- waits for training, then exports `artifacts/variant_10-heading-0.7`;
+- runs round 2's larger test set (`big_fixed_10-heading-0.7_*`, `big_hops_10-heading-0.7_*`)
+  and the heading check for this run and variant 9
+  (`outputs/evaluation/heading_variant_10-heading-0.7.txt`, `heading_variant_5-edge-clearance.txt`).
+
+The keep-alive worked: training ran the full 8 hours (update 18,123) and the tests
+finished at 07:22. The bundle is `artifacts/controller_v10`.
+
+### Variant 10 results (October 27, same larger test set as rounds 2 and 3)
+
+| | Box-ground hops | Heightfield hops | Falls (box) | Fixed test, regular / noise 0.5 / noise 1.0 | Fixed test, piles (regular / 1.0) | Robots that fell (regular / 1.0) |
+| --- | --- | --- | --- | --- | --- | --- |
+| variant 9 | 96% | 81% | 4.0% | 87.5% / 87.7% / 86.0% | 48.7% / 46.9% | 10.0% / 13.6% |
+| **variant 10, heading 0.7** | **98%** | **84%** | **1.7%** | **88.7% / 88.9% / 88.0%** | 51.9% / 45.0% | **8.9% / 10.8%** |
+
+- Variant 10 is the best controller so far. On box ground it arrives on at least 93.9%
+  of hops on every row; variant 9 drops to 78.3% on row 9.
+- On heightfield ground it is ahead on rows 0-7 but behind on rows 8-9 (52% and 54%
+  against 62% and 60%).
+- The fixed test's pile gaps are at most 7 of 160 robots (noise 0.5: 51.9% against
+  47.5%), within noise; the box-hop gain and the fewer falls are clear.
+- Training: targets reached 94.7%, pile robots' level 1.0 to 1.5, action std 0.25 to
+  0.23. Validation, mean of the last 8: 91.3% of all targets and 54.1% on piles
+  (variant 9's last 8: 89.8% and 47.5%).
+
+The heading reward still had no effect. The term stayed at -0.0025 per step for all 8
+hours (weight 0.7: the same mean gated cosine of -0.18), and the heading check gives the
+same split as variant 9:
+
+| Moving (any distance) | Mean cosine | Forwards (cos > 0.7) | Sideways | Backwards (cos < -0.7) |
+| --- | --- | --- | --- | --- |
+| variant 9 | -0.45 | 11% | 33% | 56% |
+| variant 10, heading 0.7, 8 h | -0.46 | 11% | 33% | 57% |
+
+So the gains come from 8 more hours of training, not from the heading reward. Turning
+the robot around needs a much larger weight (about 5) or a scan that is not symmetric
+front to back.
+
+Charts: `outputs/comparison_round3/` on Tanmay's laptop (plot data `outputs/comparison_round2/plot_data_variant10.txt`).
+
 ## Controller family tree
 
 An arrow means "continues training from" (`--resume`: same weights, normalizer, optimizer
@@ -710,19 +789,19 @@ flowchart TD
     VA1["variant 1 · 1–945 · 2 h<br/>from scratch, 49-point foot scan,<br/>original rewards<br/>box hops 0%"]
     VA5["variant 5 · 946–4234 · 6 h<br/>noise ramp, 8192 robots,<br/>4 tile variants, entropy 0.001<br/>box hops 73%, best general test"]
     VA8["variant 8 · 946–4299 · 6 h<br/>relaxed curriculum, 8192 robots<br/>box hops 57%, many timeouts"]
-    VA9["variant 9 · 4235–10176 · 6 h<br/>variant 5 + edge −1<br/>+ foot clearance 0.5 (Lab 1 C)<br/>box hops 96%, best overall"]
-    VA10["variant 10 · from 10177 · 6 h<br/>variant 9 + heading alignment 0.5<br/>(face the direction of travel)<br/>in progress"]
+    VA9["variant 9 · 4235–10176 · 6 h<br/>variant 5 + edge −1<br/>+ foot clearance 0.5 (Lab 1 C)<br/>box hops 96%"]
+    VA10["variant 10, first attempt · 10177–15150 · 5 h<br/>variant 9 + heading alignment 0.5<br/>server stopped at 5 h<br/>still walks backwards 57%"]
+    VA10B["variant 10, heading 0.7 · 10177–18123 · 8 h<br/>variant 9 + heading alignment 0.7<br/>still walks backwards 57%<br/>box hops 98%, best overall"]
     VA1 --> VA5
     VA1 --> VA8
     VA5 --> VA9
     VA9 --> VA10
+    VA9 --> VA10B
   end
   classDef best fill:#E1F5EE,stroke:#0F6E56,color:#085041
   classDef weak fill:#F1EFE8,stroke:#888780,color:#444441
-  classDef running fill:#EEEDFE,stroke:#534AB7,color:#3C3489,stroke-dasharray:5 4
-  class VA3,VA5,VA9 best
-  class V3,VA1 weak
-  class VA10 running
+  class VA3,VA5,VA9,VA10B best
+  class V3,VA1,VA10 weak
 ```
 
 | Controller | Starts from | What changed for its training | Box hops |
@@ -738,7 +817,8 @@ flowchart TD
 | variant 5 | variant 1 | noise ramp, 6 h, 8,192 robots, 4 tile variants, 640-robot validation, entropy 0.001 | 73% |
 | variant 8 | variant 1 | relaxed curriculum, otherwise as variant 5 | 57% |
 | variant 9 | variant 5 | edge penalty -1 and foot clearance 0.5 (Lab 1 C), otherwise as variant 5 | 96% |
-| variant 10 | variant 9 | heading alignment 0.5 (reward for facing the direction of travel), otherwise as variant 9 | in progress |
+| variant 10, first attempt | variant 9 | heading alignment 0.5 (reward for facing the direction of travel), otherwise as variant 9; server stopped at 5 h, still walks backwards 57% of the time | not tested |
+| variant 10, heading 0.7 | variant 9 | heading alignment 0.7, 8 h, otherwise as variant 9; still walks backwards 57% of the time | 98% |
 
 Configs written but not run: `kth-controller-v3-from-v2`, `kth-controller-v4-from-v2`,
 `kth-controller-v2-continued`, `kth-variant-0-control`, `kth-variant-0-scratch-v1-scan`,
