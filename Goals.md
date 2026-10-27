@@ -124,5 +124,8 @@ Dead ends with variant 10: greedy reaches the goal in 0 of 18 episodes, optimist
 | Rewrite README.md: results first (GIFs, charts, controller table, terrain design), then a brief reproduce section | Tanmay | [X] | Not recorded |
 | README GIFs (variant 10 escaping an irregular dead end; variant 10 on irregular pile training tiles) and figures in `docs/media` | Tanmay | [X] | Not recorded |
 | `scripts/dead_end_sweep.py` and the variant 10 dead-end results in `docs/results` | Tanmay | [X] | Not recorded |
+| Fix the CPU test workflow: `MUJOCO_GL` set to `disable` | Tanmay | [X] | Not recorded |
+
+The CPU workflow had failed on every push since October 14: `MUJOCO_GL: egl` makes `import mujoco` load libEGL, which the GitHub runner does not have, so test collection stopped before any test ran. The tests never render, so the workflow now disables OpenGL; all 80 tests pass that way on a clean checkout.
 
 The GIFs use selected seeds; the README gives the measured rates. `scripts/dead_end_sweep.py` reproduces a recorded episode exactly (oracle, 1 m pocket, seed 10000: 9.2 s, 9.64 m).
