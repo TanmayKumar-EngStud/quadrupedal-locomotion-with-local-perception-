@@ -57,7 +57,7 @@ def render_views(sim, scene, output):
     draw = ImageDraw.Draw(sheet)
     font = ImageFont.load_default(size=34)
     small = ImageFont.load_default(size=20)
-    draw.text((40,28), "LANGUAGE-GUIDED QUADRUPEDAL NAVIGATION", font=font, fill="#e5f0f7")
+    draw.text((40,28), "QUADRUPEDAL LOCOMOTION WITH LOCAL PERCEPTION", font=font, fill="#e5f0f7")
     draw.text((40,79), f"UNITREE Go1  /  {scene['family'].upper()} FIELD  /  LEVEL {scene['level']}  /  SEED {scene['seed']}", font=small, fill="#75d5c8")
     with Image.open(output/f"{scene['family']}_overview.png") as im:
         sheet.paste(im.resize((1040,650)), (20,132))

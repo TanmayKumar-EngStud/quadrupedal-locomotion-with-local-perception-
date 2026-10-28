@@ -127,7 +127,7 @@ git log --oneline -3                                               # the newest 
 ls configs/kth-controller-v3.json                                  # must exist
 ```
 
-On a fresh machine instead: `git clone -b tanmay https://github.com/TanmayKumar-EngStud/Language-Guided-Quadrupedal-Navigation.git`.
+On a fresh machine instead: `git clone -b tanmay https://github.com/TanmayKumar-EngStud/quadrupedal-locomotion-with-local-perception-.git`.
 
 ### 2. Environment and GPU check
 
