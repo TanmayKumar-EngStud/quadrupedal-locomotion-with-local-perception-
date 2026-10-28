@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "language-guided-quadrupedal-navigation"
+name = "quadrupedal-locomotion-with-local-perception"
 version = "0.1.0"
-description = "MuJoCo Go1 scenes for language-guided navigation over sparse terrain"
+description = "Unitree Go1 in MuJoCo: PPO locomotion with local terrain perception over pile fields"
 requires-python = ">=3.12"
 dependencies = ["mujoco==3.13.0", "numpy>=2,<3", "pillow>=11,<12"]
 
