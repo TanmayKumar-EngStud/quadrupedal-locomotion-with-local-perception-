@@ -65,7 +65,7 @@ The ZIP contains `controller.pt` (actor, critic, normalizers, optimizer and conf
 From your LOCAL terminal (replace user/host/path with the cloud provider's details):
 
 ```sh
-scp user@GPU_HOST:/workspace/Language-Guided-Quadrupedal-Navigation/artifacts/controller.zip ./artifacts/
+scp user@GPU_HOST:/workspace/quadrupedal-locomotion-with-local-perception-/artifacts/controller.zip ./artifacts/
 unzip artifacts/controller.zip -d artifacts/controller
 ```
 

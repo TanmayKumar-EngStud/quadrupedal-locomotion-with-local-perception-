@@ -126,9 +126,12 @@ Dead ends with variant 10: greedy reaches the goal in 0 of 18 episodes, optimist
 | `scripts/dead_end_sweep.py` and the variant 10 dead-end results in `docs/results` | Tanmay | [X] | Not recorded |
 | Fix the CPU test workflow: `MUJOCO_GL` set to `disable` | Tanmay | [X] | Not recorded |
 | Make the fine-heightfield test robust to platform rounding | Tanmay | [X] | Not recorded |
+| Rename the project after the GitHub repository (`quadrupedal-locomotion-with-local-perception-`): package name, description, clone URLs and render title | Tanmay | [X] | Not recorded |
 
 The CPU workflow had failed on every push since October 14: `MUJOCO_GL: egl` makes `import mujoco` load libEGL, which the GitHub runner does not have, so test collection stopped before any test ran. The tests never render, so the workflow now disables OpenGL.
 
 With the import fixed, `test_fine_heightfield_matches_height_samples_at_grid_nodes` failed on the Linux runner only. Its rays hit exact heightfield vertices, and one at a pile corner (7.95, 6.4) read the 0.5 m pit floor instead of the pile top; a 0.000001 m shift reproduces this on macOS. The test now checks only flat neighbourhoods and casts each ray inside the cell. All 50 checked rays hold under shifts of up to 0.0001 m, and all 80 tests pass on a clean checkout.
+
+The project has no language component, so the repository was renamed from Language-Guided-Quadrupedal-Navigation; GitHub redirects the old URL. Folder paths on the KTH servers keep the old name.
 
 The GIFs use selected seeds; the README gives the measured rates. `scripts/dead_end_sweep.py` reproduces a recorded episode exactly (oracle, 1 m pocket, seed 10000: 9.2 s, 9.64 m).

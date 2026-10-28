@@ -92,46 +92,6 @@ wheels = [
 ]
 
 [[package]]
-name = "language-guided-quadrupedal-navigation"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "mujoco" },
-    { name = "numpy" },
-    { name = "pillow" },
-]
-
-[package.optional-dependencies]
-cloud = [
-    { name = "mujoco-warp" },
-    { name = "torch" },
-    { name = "warp-lang" },
-]
-train = [
-    { name = "torch" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "mujoco", specifier = "==3.13.0" },
-    { name = "mujoco-warp", marker = "extra == 'cloud'", specifier = "==3.13.0" },
-    { name = "numpy", specifier = ">=2,<3" },
-    { name = "pillow", specifier = ">=11,<12" },
-    { name = "torch", marker = "extra == 'cloud'", specifier = "==2.8.0" },
-    { name = "torch", marker = "extra == 'train'", specifier = "==2.8.0" },
-    { name = "warp-lang", marker = "extra == 'cloud'", specifier = "==1.15.0" },
-]
-provides-extras = ["train", "cloud"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8,<9" }]
-
-[[package]]
 name = "markupsafe"
 version = "3.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -633,6 +593,46 @@ sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/a4/20da314d277121d6534b3a980b29035dcd51e6744bd79075a6ce8fa4eb8d/pytest-8.4.2-py3-none-any.whl", hash = "sha256:872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79", size = 365750, upload-time = "2025-09-04T14:34:20.226Z" },
 ]
+
+[[package]]
+name = "quadrupedal-locomotion-with-local-perception"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "mujoco" },
+    { name = "numpy" },
+    { name = "pillow" },
+]
+
+[package.optional-dependencies]
+cloud = [
+    { name = "mujoco-warp" },
+    { name = "torch" },
+    { name = "warp-lang" },
+]
+train = [
+    { name = "torch" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mujoco", specifier = "==3.13.0" },
+    { name = "mujoco-warp", marker = "extra == 'cloud'", specifier = "==3.13.0" },
+    { name = "numpy", specifier = ">=2,<3" },
+    { name = "pillow", specifier = ">=11,<12" },
+    { name = "torch", marker = "extra == 'cloud'", specifier = "==2.8.0" },
+    { name = "torch", marker = "extra == 'train'", specifier = "==2.8.0" },
+    { name = "warp-lang", marker = "extra == 'cloud'", specifier = "==1.15.0" },
+]
+provides-extras = ["train", "cloud"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8,<9" }]
 
 [[package]]
 name = "setuptools"
