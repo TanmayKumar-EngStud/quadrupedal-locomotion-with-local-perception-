@@ -33,13 +33,10 @@ KTH DD2600 Robot Learning and Embodied AI, October 2026 · Tanmay Kumar, Amedeo 
 
 ## How it works
 
-```mermaid
-flowchart LR
-  S["MuJoCo scene<br/>Go1 on piles"] -- "robot pose + piles within 2 m" --> P["Planner<br/>greedy · optimistic · A* oracle"]
-  P -- "next pile (x, y)" --> A["PPO actor<br/>50 Hz"]
-  S -- "joints, body motion, terrain heights" --> A
-  A -- "12 joint targets" --> S
-```
+<p align="center">
+  <a href="docs/media/architecture.jpg"><img src="docs/media/architecture.jpg" width="100%" alt="Architecture. Top: PPO training on the GPU, where MuJoCo Warp simulates many Go1 robots with random targets, the critic predicts future reward from privileged information and the advantage updates the actor. Bottom: navigation at test time on the CPU, where the terrain scene and robot position feed the greedy, optimistic or A* oracle planner, which sends the next pile to the trained actor, which sends 12 joint targets at 50 Hz to the Go1 in MuJoCo."></a>
+</p>
+<p align="center"><sub><b>Top:</b> training on the GPU. The critic, which also sees privileged information, predicts future reward, and the advantage tells the actor whether an action was better or worse than expected. <b>Bottom:</b> navigation at test time on a CPU. A planner picks the next pile, and the trained actor (dashed arrow) turns it into 12 joint targets at 50 Hz. The A* oracle sees the whole map; the other planners see only 2 m.</sub></p>
 
 **Planner** (classical, no learning). Each planner may pick only piles that pass a hop rule: inside the 2 m view, at most 2 m away, along a straight line with at most 14 cm of pit and 5 cm of height change under both lines of feet.
 - **Greedy:** no memory; takes the allowed pile closest to the goal.

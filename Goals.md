@@ -135,3 +135,9 @@ With the import fixed, `test_fine_heightfield_matches_height_samples_at_grid_nod
 The project has no language component, so the repository was renamed from Language-Guided-Quadrupedal-Navigation; GitHub redirects the old URL. Folder paths on the KTH servers keep the old name.
 
 The GIFs use selected seeds; the README gives the measured rates. `scripts/dead_end_sweep.py` reproduces a recorded episode exactly (oracle, 1 m pocket, seed 10000: 9.2 s, 9.64 m).
+
+## November 2, 2026
+
+| Goals | Contributor | Status | Time taken |
+| --- | --- | --- | --- |
+| README "How it works": replace the Mermaid flowchart with the hand-drawn architecture diagram from the final presentation (training and test time), in `docs/media/architecture.jpg` | Tanmay | [X] | Not recorded |
