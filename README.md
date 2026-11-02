@@ -12,6 +12,18 @@ KTH DD2600 Robot Learning and Embodied AI, October 2026 · Tanmay Kumar, Amedeo 
 </p>
 <p align="center"><sub><b>Top:</b> optimistic planner + variant 10 controller in an irregular dead-end scene. The green disc is the 2 m view; the red ball is the next pile. <b>Bottom:</b> variant 10 on irregular pile training tiles, levels 3 and 7. The clips use selected seeds; the measured success rates are in <a href="#results">Results</a>.</sub></p>
 
+## Table of Contents
+
+- [Results at a glance](#results-at-a-glance)
+- [How it works](#how-it-works)
+- [Terrain design](#terrain-design)
+- [Results](#results)
+  - [Controller generations](#controller-generations)
+  - [Planning with a 2 m view](#planning-with-a-2-m-view)
+  - [Key findings](#key-findings)
+- [Reproduce](#reproduce)
+- [Repository](#repository)
+
 ## Results at a glance
 
 - **98.3%** of 6,732 pile hops arrive with the best controller (variant 10), up from **42%** for the first controller.
