@@ -316,13 +316,13 @@ Amedeo's server needs a fresh copy:
 - **Clone**, if his GitHub account can read the repository; he types his own
   token:
   ```sh
-  git clone -b tanmay https://github.com/TanmayKumar-EngStud/Language-Guided-Quadrupedal-Navigation.git
+  git clone -b tanmay https://github.com/TanmayKumar-EngStud/quadrupedal-locomotion-with-local-perception-.git
   ```
 - **Or from a full bundle** made on Tanmay's laptop with
   `git bundle create ../repo_tanmay.bundle tanmay` and uploaded to Amedeo's home
   folder:
   ```sh
-  git clone -b tanmay ~/repo_tanmay.bundle Language-Guided-Quadrupedal-Navigation
+  git clone -b tanmay ~/repo_tanmay.bundle quadrupedal-locomotion-with-local-perception
   ```
 
 Then check that `configs/kth-variant-5-feet49-noise-ramp.json` exists and
